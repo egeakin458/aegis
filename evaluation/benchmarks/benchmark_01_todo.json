@@ -1,0 +1,68 @@
+{
+  "task_id": "benchmark_01_todo",
+  "name": "Personal To-Do List with Categories",
+  "description": "A simple to-do list application where a user can create, view, complete, and delete tasks organized by categories.",
+  "complexity": "simple",
+  "customer_config": {
+    "business_context": {
+      "name": "TaskMaster",
+      "industry": "professional_services",
+      "description": "I run a small consulting business and need a simple way to track my daily tasks and organize them by project.",
+      "size": "1-5"
+    },
+    "problem_statement": {
+      "problem": "I need to track my daily tasks and organize them by project or category. Right now I use sticky notes and keep losing them.",
+      "users": ["owner"],
+      "current_process": "Sticky notes and a paper notebook"
+    },
+    "features": {
+      "requested": [
+        { "description": "Add new tasks with a title and optional description", "priority": 1 },
+        { "description": "Organize tasks into categories or projects", "priority": 2 },
+        { "description": "Mark tasks as complete", "priority": 3 },
+        { "description": "Delete tasks I no longer need", "priority": 4 },
+        { "description": "See all my tasks in one view, filterable by category", "priority": 5 }
+      ]
+    },
+    "data": {
+      "entities": "Task title, task description, category name, completion status, date created",
+      "has_existing_data": false,
+      "uploads": [],
+      "volume": "under_100"
+    },
+    "design": {
+      "colors": null,
+      "logo": null,
+      "references": [],
+      "style": "clean_minimal"
+    },
+    "technical": {
+      "access_scope": "just_me",
+      "auth_required": false,
+      "mobile": "nice_to_have"
+    },
+    "meta": {
+      "deadline": null,
+      "notes": "Keep it simple, I just want something that works."
+    }
+  },
+  "expected_features": [
+    "Create a new task with title and description",
+    "Assign a task to a category",
+    "View all tasks",
+    "Filter tasks by category",
+    "Mark task as complete",
+    "Delete a task",
+    "Categories are manageable (create at minimum)"
+  ],
+  "unit_tests": [
+    "API: POST /tasks creates a new task and returns it with an ID",
+    "API: GET /tasks returns all tasks",
+    "API: GET /tasks?category=X returns filtered tasks",
+    "API: PUT /tasks/:id with completed=true marks task complete",
+    "API: DELETE /tasks/:id removes the task",
+    "API: POST /categories creates a new category",
+    "Frontend: Task list page renders without errors",
+    "Frontend: Add task form exists and has required fields"
+  ]
+}
