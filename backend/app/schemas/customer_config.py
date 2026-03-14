@@ -7,7 +7,7 @@ and the finalized config produced by the Requirements Analyst.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -130,7 +130,7 @@ class ProjectMeta(BaseModel):
     """Section 7: Timeline and additional info."""
     deadline: Optional[datetime] = Field(None, description="Hard deadline if any")
     notes: Optional[str] = Field(None, description="Additional notes")
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # --- Top-level config models ---

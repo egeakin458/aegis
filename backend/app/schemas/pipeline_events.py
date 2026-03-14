@@ -7,7 +7,7 @@ and for SQLite logging for evaluation.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
@@ -85,7 +85,7 @@ class PipelineEvent(BaseModel):
     """
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     run_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     agent: AgentName
     event_type: EventType
     message: str = Field(..., description="Human-readable, business-language message for the UI")
@@ -105,7 +105,7 @@ class PipelineRun(BaseModel):
     Used for evaluation and process fidelity analysis.
     """
     run_id: str = Field(default_factory=lambda: str(uuid4()))
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     state: PipelineState = PipelineState.INTAKE
     task_id: Optional[str] = Field(None, description="Benchmark task ID if this is an evaluation run")

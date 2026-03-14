@@ -7,7 +7,7 @@ and beta user feedback.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -51,7 +51,7 @@ class EvaluationResult(BaseModel):
     tokens_used: Optional[dict[str, int]] = None
     duration_ms: Optional[int] = None
     cost_usd: Optional[float] = None
-    evaluated_at: datetime = Field(default_factory=datetime.utcnow)
+    evaluated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BetaFeedback(BaseModel):
@@ -66,4 +66,4 @@ class BetaFeedback(BaseModel):
     trust_issues_detail: Optional[str] = None
     improvement_suggestions: Optional[str] = None
     would_use_again: bool
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

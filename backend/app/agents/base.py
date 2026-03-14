@@ -10,6 +10,7 @@ All Aegis agents inherit from this class. It handles:
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any, Callable, Optional, Type
 
@@ -50,7 +51,7 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.output_schema = output_schema
         self.model = model or settings.primary_model
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     def build_user_prompt(self, context: dict[str, Any]) -> str:
         """
@@ -162,8 +163,7 @@ class BaseAgent:
 
         start = time.time()
 
-        # Synchronous call (will be run in executor by FastAPI)
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             model=self.model,
             max_tokens=settings.max_tokens,
             system=self.system_prompt,
@@ -190,8 +190,6 @@ class BaseAgent:
 
     def _validate_output(self, raw_text: str) -> BaseModel:
         """Parse and validate agent output against the schema."""
-        import json
-
         # Strip markdown code fences if present
         text = raw_text.strip()
         if text.startswith("```json"):

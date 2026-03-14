@@ -5,14 +5,16 @@ Loads settings from environment variables.
 All secrets and configuration live here — never hardcoded elsewhere.
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     # Anthropic API
-    anthropic_api_key: str
+    anthropic_api_key: str = ""
     primary_model: str = "claude-sonnet-4-5-20250514"
     secondary_model: str = "claude-haiku-4-5-20251001"
     max_tokens: int = 8192
@@ -31,10 +33,6 @@ class Settings(BaseSettings):
 
     # Output
     output_dir: str = "outputs"  # Where generated code projects are saved
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 # Singleton instance — import this wherever settings are needed
