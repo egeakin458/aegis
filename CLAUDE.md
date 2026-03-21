@@ -1,20 +1,61 @@
-# Aegis — Claude Code Project Context
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What Is Aegis
 Aegis is a B2B virtual software company powered by a multi-agent AI pipeline. A non-technical business user fills out an intake form describing what they need, and Aegis's agent pipeline handles requirements gathering, solution design, implementation, and quality review — producing a full-stack web application.
 
 This is a senior thesis project (Izmir University of Economics, Computer Engineering). The goal is a working, demonstrable product deployed to a beta group (student + supervisor) by Week 16.
 
+## Development Commands
+
+All commands run from `backend/` with the virtualenv active.
+
+```bash
+# Setup
+cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env       # then fill in ANTHROPIC_API_KEY
+
+# Run dev server
+uvicorn app.main:app --reload --port 8000
+
+# Run all tests
+pytest tests/
+
+# Run a single test file
+pytest tests/test_schemas.py
+
+# Run a single test class or function
+pytest tests/test_schemas.py::TestCustomerConfig
+pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config
+```
+
 ## Architecture Summary
-- **4 agents in a linear pipeline with feedback loops:**
-  1. **Requirements Analyst** — Analyzes raw customer config, runs clarification loop, produces finalized requirements
-  2. **Solution Architect** — Produces technical design (data models, API specs, component breakdown, file structure)
-  3. **Developer** — Produces actual code files (full-stack web app)
-  4. **QA Reviewer** — Reviews code against requirements + design, issues revision requests or approves
-- **Feedback loops (cycle-capped):**
-  - QA → Developer: max 2 revision cycles
-  - QA → Architect: max 1 design revision cycle
-- **Pipeline topology:** Linear with conditional backward edges. Default path: RA → SA → Dev → QA → Output.
+
+**4 agents in a linear pipeline with feedback loops:**
+1. **Requirements Analyst** — Analyzes raw `CustomerConfig`, runs clarification loop (max 3 rounds), outputs `FinalizedConfig`
+2. **Solution Architect** — Receives `FinalizedConfig`, produces `TechnicalDesign` (data models, API specs, UI components, file structure)
+3. **Developer** — Receives `FinalizedConfig` + `TechnicalDesign`, produces `CodeOutput` (complete code files forming a runnable project)
+4. **QA Reviewer** — Receives all upstream outputs, outputs `QAReview` with verdict: `approve | revise_code | revise_design`
+
+**Schema data flow:**
+```
+CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev → CodeOutput → QA → QAReview
+                                                                                        ↓
+                                                                          verdict: approve → done
+                                                                          verdict: revise_code → Dev (max 2 cycles)
+                                                                          verdict: revise_design → SA (max 1 cycle)
+```
+
+**Default pipeline path:** RA → SA → Dev → QA → Output
+
+**Context passing — each agent receives:**
+- **Solution Architect**: full `FinalizedConfig`
+- **Developer**: full `FinalizedConfig` + `TechnicalDesign` (RA output is summarized into the design)
+- **QA Reviewer**: full `FinalizedConfig` + `TechnicalDesign` (as reference) + `CodeOutput`
 
 ## Tech Stack
 | Layer | Technology |
@@ -34,71 +75,40 @@ This is a senior thesis project (Izmir University of Economics, Computer Enginee
 - **Every pipeline event MUST be logged** to SQLite with timestamp, agent, event type, token usage, duration
 - **The observation UI is a core feature** — events must be emitted in business-friendly language, not raw logs
 - **The customer intake form is the mandatory entry point** — no pipeline runs without a validated config
-- **Code quality matters** — the Aegis codebase itself must follow clean architecture, separation of concerns, proper documentation
+- **Custom orchestration only** — do NOT use LangChain, CrewAI, AutoGen, or any agent framework (the orchestration layer is the thesis's core intellectual contribution)
 
-## Folder Structure
-```
-aegis/
-├── CLAUDE.md                    # This file — project context for Claude Code
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Settings & environment variables
-│   │   ├── schemas/             # Pydantic models for ALL data contracts
-│   │   │   ├── __init__.py
-│   │   │   ├── customer_config.py
-│   │   │   ├── agent_outputs.py
-│   │   │   ├── pipeline_events.py
-│   │   │   └── evaluation.py
-│   │   ├── agents/              # Agent implementations
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py          # BaseAgent class
-│   │   │   ├── requirements_analyst.py
-│   │   │   ├── solution_architect.py
-│   │   │   ├── developer.py
-│   │   │   └── qa_reviewer.py
-│   │   ├── pipeline/            # Orchestration engine
-│   │   │   ├── __init__.py
-│   │   │   └── runner.py        # PipelineRunner state machine
-│   │   ├── api/                 # REST & SSE endpoints
-│   │   │   ├── __init__.py
-│   │   │   └── routes.py
-│   │   └── db/                  # SQLite persistence
-│   │       ├── __init__.py
-│   │       └── database.py
-│   ├── tests/
-│   │   └── test_pipeline.py
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/                    # Next.js app (scaffold separately)
-│   └── ...
-├── evaluation/
-│   ├── benchmarks/              # Pre-filled customer configs for testing
-│   ├── scripts/                 # Evaluation runner scripts
-│   └── results/                 # Evaluation output data
-├── docs/
-│   ├── architecture.md
-│   └── Aegis_Research_Decisions_Plan.md
-├── .gitignore
-└── README.md
+## How Agents Work
+
+`BaseAgent` (`app/agents/base.py`) handles all LLM calls. Subclasses only implement `build_user_prompt(context: dict) -> str`. The base class:
+1. Emits `AGENT_START` event
+2. Calls LLM via `anthropic.AsyncAnthropic`
+3. Strips markdown fences from response, then parses JSON and validates with Pydantic
+4. On `ValidationError`: re-prompts **once** with the error message appended; raises `ValueError` if still invalid
+5. Emits `VALIDATION_PASSED` or `ERROR` event with token counts and duration
+
+**Creating a new agent subclass:**
+```python
+class MyAgent(BaseAgent):
+    def __init__(self):
+        super().__init__(
+            name=AgentName.MY_AGENT,
+            system_prompt="...",
+            output_schema=MyOutputModel,  # Pydantic model
+        )
+
+    def build_user_prompt(self, context: dict[str, Any]) -> str:
+        # Build user message from pipeline context
+        return "..."
 ```
 
-## Current Phase
-**Phase 1: Core Pipeline Engine (Week 4-5)**
-- [x] Project skeleton created
-- [x] Pydantic schemas defined
-- [x] Foundation verified (all fixes applied, 28 tests passing)
-- [x] Agent base class
-- [ ] Requirements Analyst agent
-- [ ] Solution Architect agent
-- [ ] Developer agent
-- [ ] QA Reviewer agent
-- [ ] PipelineRunner state machine
-- [ ] Integration test (full pipeline from config to output)
+The `execute()` method signature: `async execute(context, run_id, emit_event) -> BaseModel`
+- `context`: dict with upstream agent outputs
+- `run_id`: pipeline run UUID string
+- `emit_event`: callback `Callable[[PipelineEvent], None]`
+
+All settings come from `app/config.py` via `pydantic-settings` (loaded from `.env`). Import the singleton: `from app.config import settings`.
 
 ## Agent System Prompt Structure
-Every agent prompt follows this template:
 ```
 [IDENTITY] You are the {Role Name} at Aegis, a virtual software company.
 [RESPONSIBILITY] Your job is to {task}. You receive {input} and produce {output}.
@@ -109,7 +119,7 @@ Every agent prompt follows this template:
 ```
 
 ## Pipeline Event Format
-All events emitted to the frontend follow the PipelineEvent schema:
+All events emitted to the frontend follow the `PipelineEvent` schema (`app/schemas/pipeline_events.py`):
 ```json
 {
   "event_id": "uuid",
@@ -124,10 +134,29 @@ All events emitted to the frontend follow the PipelineEvent schema:
 }
 ```
 
+## Evaluation Framework
+The `app/schemas/evaluation.py` schemas and `evaluation/benchmarks/` directory support thesis evaluation:
+- **BenchmarkTask**: Predefined customer configs at 3 complexity tiers (simple/medium/complex)
+- **LLM-as-judge**: `JudgeScore` with 3 independent scoring runs per task, averaged for reliability
+- **BetaFeedback**: Structured survey from beta testers (student + supervisor)
+
 ## Important Implementation Notes
 - Use `anthropic` Python SDK for all LLM calls — do NOT use LangChain, CrewAI, or any framework
-- Agent outputs are validated with Pydantic; if validation fails, re-prompt the agent ONCE with the error
 - The PipelineRunner is a simple state machine (~300-500 LOC), not a complex framework
-- SSE uses `sse-starlette` library; the frontend uses native `EventSource` API
+- SSE uses `sse-starlette`; the frontend uses native `EventSource` API
+- SQLite via Python's built-in `sqlite3` module (plus `aiosqlite` for async) — no ORM
 - All secrets go in `.env` (gitignored), never hardcoded
-- SQLite via Python's built-in `sqlite3` module — no ORM needed for this scale
+- All schemas are re-exported from `app/schemas/__init__.py` for clean imports
+
+## Current Phase
+**Phase 1: Core Pipeline Engine (Weeks 4-5)**
+- [x] Project skeleton created
+- [x] Pydantic schemas defined
+- [x] Foundation verified (all fixes applied, 28 tests passing)
+- [x] Agent base class
+- [x] Requirements Analyst agent
+- [x] Solution Architect agent
+- [x] Developer agent
+- [x] QA Reviewer agent
+- [x] PipelineRunner state machine
+- [x] Integration test (full pipeline from config to output, 254 tests passing)

@@ -101,7 +101,7 @@ class CodeOutput(BaseModel):
     A complete, structured collection of code files forming a runnable project.
     """
     reasoning: str = Field(..., description="Developer's reasoning about implementation decisions")
-    project_name: str
+    project_name: str = Field(..., description="Application name in kebab-case, must match TechnicalDesign.project_name")
     files: list[CodeFile] = Field(..., min_length=1)
     setup_instructions: str = Field(..., description="How to install dependencies and run the project")
     features_implemented: list[str] = Field(..., description="List of features from the requirements that were implemented")

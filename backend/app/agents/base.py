@@ -90,62 +90,56 @@ class BaseAgent:
             message=self._start_message(),
         ))
 
-        # First attempt
-        result, tokens, duration = await self._call_llm(user_prompt, run_id, emit_event)
+        max_attempts = 2
+        last_error: ValidationError | None = None
 
-        # Validate output
-        try:
-            parsed = self._validate_output(result)
-            emit_event(PipelineEvent(
-                run_id=run_id,
-                agent=self.name,
-                event_type=EventType.VALIDATION_PASSED,
-                message=f"{self._display_name()} completed their work.",
-                tokens_used=tokens,
-                duration_ms=duration,
-            ))
-            return parsed
+        for attempt in range(max_attempts):
+            # On retry, append the validation error to help the LLM self-correct
+            prompt = user_prompt
+            if last_error:
+                prompt = (
+                    f"{user_prompt}\n\n"
+                    f"Your previous response had a formatting error:\n{last_error}\n\n"
+                    f"Please respond again with valid JSON matching the required schema exactly."
+                )
 
-        except ValidationError as e:
-            # Retry once with the error message
-            emit_event(PipelineEvent(
-                run_id=run_id,
-                agent=self.name,
-                event_type=EventType.VALIDATION_FAILED,
-                message=f"{self._display_name()} is revising their output format...",
-                data={"error": str(e)},
-            ))
-
-            retry_prompt = (
-                f"{user_prompt}\n\n"
-                f"Your previous response had a formatting error:\n{e}\n\n"
-                f"Please respond again with valid JSON matching the required schema exactly."
-            )
-            result, tokens2, duration2 = await self._call_llm(retry_prompt, run_id, emit_event)
+            result, tokens, duration = await self._call_llm(prompt, run_id, emit_event)
 
             try:
                 parsed = self._validate_output(result)
                 emit_event(PipelineEvent(
                     run_id=run_id,
                     agent=self.name,
-                    event_type=EventType.VALIDATION_PASSED,
+                    event_type=EventType.AGENT_COMPLETE,
                     message=f"{self._display_name()} completed their work.",
-                    tokens_used=tokens2,
-                    duration_ms=duration2,
+                    tokens_used=tokens,
+                    duration_ms=duration,
                 ))
                 return parsed
 
-            except ValidationError as e2:
+            except ValidationError as e:
+                last_error = e
+                is_final_attempt = attempt == max_attempts - 1
+
+                if is_final_attempt:
+                    emit_event(PipelineEvent(
+                        run_id=run_id,
+                        agent=self.name,
+                        event_type=EventType.ERROR,
+                        message=f"{self._display_name()} was unable to produce valid output.",
+                        data={"error": str(e), "raw_output": result[:500]},
+                    ))
+                    raise ValueError(
+                        f"Agent {self.name.value} failed output validation after retry: {e}"
+                    ) from e
+
                 emit_event(PipelineEvent(
                     run_id=run_id,
                     agent=self.name,
-                    event_type=EventType.ERROR,
-                    message=f"{self._display_name()} was unable to produce valid output.",
-                    data={"error": str(e2), "raw_output": result[:500]},
+                    event_type=EventType.VALIDATION_FAILED,
+                    message=f"{self._display_name()} is revising their output format...",
+                    data={"error": str(e)},
                 ))
-                raise ValueError(
-                    f"Agent {self.name.value} failed output validation after retry: {e2}"
-                ) from e2
 
     async def _call_llm(
         self,
@@ -166,7 +160,11 @@ class BaseAgent:
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=settings.max_tokens,
-            system=self.system_prompt,
+            system=[{
+                "type": "text",
+                "text": self.system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }],
             messages=[{"role": "user", "content": user_prompt}],
         )
 
