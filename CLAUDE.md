@@ -58,6 +58,8 @@ CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev →
 - **QA Reviewer**: full `FinalizedConfig` + `TechnicalDesign` (as reference) + `CodeOutput`
 
 ## Tech Stack
+
+### Aegis Platform (this repo)
 | Layer | Technology |
 |-------|-----------|
 | LLM API | Anthropic Claude API (Sonnet 4.5 primary, Haiku 4.5 for validation/eval) |
@@ -68,6 +70,23 @@ CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev →
 | Validation | Pydantic v2 for all inter-agent message schemas |
 | Deployment | Railway (backend) + Vercel (frontend) |
 
+### Generated Applications (pipeline output)
+All applications produced by the pipeline use a **fixed tech stack** to reduce variance and ensure consistent quality:
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router — not Pages Router) |
+| Styling | Tailwind CSS (utility classes, no CSS modules) |
+| Database | SQLite via better-sqlite3 (raw SQL, no ORM) |
+| Language | JavaScript (not TypeScript for prototype simplicity) |
+
+**Conventions enforced in agent prompts:**
+- Pages in `app/` directory, API route handlers in `app/api/`
+- React Server Components by default; `"use client"` only for interactive components
+- Database via `lib/db.js` using better-sqlite3
+- Config files: `package.json`, `next.config.js`, `tailwind.config.js`, `postcss.config.js`
+- Core dependencies always include: `next`, `tailwindcss`, `better-sqlite3`, `postcss`, `autoprefixer`
+
 ## Key Constraints
 - **Single-customer system** — no auth, no multi-user, one pipeline run at a time
 - **All inter-agent communication uses structured JSON** validated by Pydantic schemas
@@ -76,6 +95,7 @@ CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev →
 - **The observation UI is a core feature** — events must be emitted in business-friendly language, not raw logs
 - **The customer intake form is the mandatory entry point** — no pipeline runs without a validated config
 - **Custom orchestration only** — do NOT use LangChain, CrewAI, AutoGen, or any agent framework (the orchestration layer is the thesis's core intellectual contribution)
+- **Fixed output tech stack** — generated apps always use Next.js 14 (App Router) + Tailwind CSS + better-sqlite3. Agents must NOT choose alternative frameworks, styling libraries, or databases
 
 ## How Agents Work
 
@@ -112,10 +132,10 @@ All settings come from `app/config.py` via `pydantic-settings` (loaded from `.en
 ```
 [IDENTITY] You are the {Role Name} at Aegis, a virtual software company.
 [RESPONSIBILITY] Your job is to {task}. You receive {input} and produce {output}.
+[TECHNOLOGY STACK] Fixed stack: Next.js 14 App Router, Tailwind CSS, better-sqlite3.
+[METHODOLOGY] Step-by-step process for the agent's task.
 [CONSTRAINTS] You must NOT {boundaries}. You must ALWAYS {mandatory behaviors}.
 [OUTPUT FORMAT] Your response must be valid JSON matching this exact schema: {schema}
-[CONTEXT] Customer project: {config}. Previous agent output: {upstream}.
-[TASK] Analyze the above and produce your output now.
 ```
 
 ## Pipeline Event Format
@@ -160,3 +180,4 @@ The `app/schemas/evaluation.py` schemas and `evaluation/benchmarks/` directory s
 - [x] QA Reviewer agent
 - [x] PipelineRunner state machine
 - [x] Integration test (full pipeline from config to output, 254 tests passing)
+- [x] Tech stack pinned to Next.js 14 + Tailwind CSS + better-sqlite3 in all agent prompts

@@ -88,7 +88,7 @@ def _make_technical_design() -> TechnicalDesign:
     return TechnicalDesign(
         reasoning="Standard CRUD design.",
         project_name="cafe-ordering",
-        tech_summary="React + FastAPI + SQLite",
+        tech_summary="Next.js 14 with App Router, Tailwind CSS, better-sqlite3",
         data_models=[
             DataModel(
                 name="Order",
@@ -115,9 +115,9 @@ def _make_technical_design() -> TechnicalDesign:
             )
         ],
         file_structure=[
-            FileSpec(path="src/pages/OrderList.jsx", purpose="Order list page")
+            FileSpec(path="app/orders/page.js", purpose="Order list page")
         ],
-        dependencies=["react", "fastapi"],
+        dependencies=["next", "tailwindcss", "better-sqlite3"],
     )
 
 
@@ -127,13 +127,13 @@ def _make_code_output() -> CodeOutput:
         project_name="cafe-ordering",
         files=[
             CodeFile(
-                path="src/pages/OrderList.jsx",
-                content="export default function OrderList() { return <div>Orders</div>; }",
+                path="app/orders/page.js",
+                content="export default function OrderList() { return <div className='p-4'>Orders</div>; }",
                 language="javascript",
                 description="Order list component",
             )
         ],
-        setup_instructions="npm install && npm start",
+        setup_instructions="npm install && npm run dev",
         features_implemented=["Order listing"],
         known_limitations=[],
     )

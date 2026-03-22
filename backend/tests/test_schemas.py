@@ -111,7 +111,7 @@ def sample_technical_design() -> TechnicalDesign:
     return TechnicalDesign(
         reasoning="Standard CRUD app with order management.",
         project_name="cafe-latte-ordering",
-        tech_summary="Next.js frontend, FastAPI backend, SQLite database.",
+        tech_summary="Next.js 14 with App Router, Tailwind CSS, better-sqlite3",
         data_models=[
             DataModel(
                 name="MenuItem",
@@ -143,10 +143,10 @@ def sample_technical_design() -> TechnicalDesign:
             ),
         ],
         file_structure=[
-            FileSpec(path="src/pages/Menu.jsx", purpose="Menu display page"),
-            FileSpec(path="src/api/menu.py", purpose="Menu API endpoints"),
+            FileSpec(path="app/menu/page.js", purpose="Menu display page"),
+            FileSpec(path="app/api/menu/route.js", purpose="Menu API route handler"),
         ],
-        dependencies=["react", "fastapi", "sqlite3"],
+        dependencies=["next", "tailwindcss", "better-sqlite3"],
     )
 
 

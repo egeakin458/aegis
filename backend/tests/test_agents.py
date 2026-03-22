@@ -40,9 +40,9 @@ from app.schemas.pipeline_events import AgentName, EventType, PipelineEvent
 def _technical_design_payload() -> dict:
     """Minimal valid TechnicalDesign dict (mirrors the Pydantic schema)."""
     return {
-        "reasoning": "Using a REST API with a React frontend for the ordering system.",
+        "reasoning": "Designing a Next.js 14 application with Tailwind CSS for the ordering system.",
         "project_name": "cafe-latte-ordering",
-        "tech_summary": "FastAPI backend with SQLite, React frontend.",
+        "tech_summary": "Next.js 14 with App Router, Tailwind CSS, better-sqlite3",
         "data_models": [
             {
                 "name": "MenuItem",
@@ -92,10 +92,10 @@ def _technical_design_payload() -> dict:
             }
         ],
         "file_structure": [
-            {"path": "backend/main.py", "purpose": "FastAPI application entry point."},
-            {"path": "frontend/src/pages/Menu.jsx", "purpose": "Menu page component."},
+            {"path": "app/api/menu/route.js", "purpose": "Menu API route handler."},
+            {"path": "app/menu/page.js", "purpose": "Menu page component."},
         ],
-        "dependencies": ["fastapi", "react"],
+        "dependencies": ["next", "tailwindcss", "better-sqlite3"],
         "notes": None,
     }
 
@@ -107,19 +107,19 @@ def _code_output_payload() -> dict:
         "project_name": "cafe-latte-ordering",
         "files": [
             {
-                "path": "backend/main.py",
-                "content": "from fastapi import FastAPI\napp = FastAPI()\n",
-                "language": "python",
-                "description": "Main FastAPI application.",
+                "path": "app/api/menu/route.js",
+                "content": "import { NextResponse } from 'next/server';\nexport async function GET() { return NextResponse.json([]); }\n",
+                "language": "javascript",
+                "description": "Menu API route handler.",
             },
             {
-                "path": "frontend/src/pages/Menu.jsx",
-                "content": "export default function MenuPage() { return <div>Menu</div>; }",
+                "path": "app/menu/page.js",
+                "content": "export default function MenuPage() { return <div className='p-4'>Menu</div>; }",
                 "language": "javascript",
                 "description": "Menu page component.",
             },
         ],
-        "setup_instructions": "pip install -r requirements.txt && npm install",
+        "setup_instructions": "npm install && npm run dev",
         "features_implemented": [
             "Menu display with categories",
             "Shopping cart and checkout",
@@ -415,11 +415,11 @@ class TestSolutionArchitectExecute:
         invalid_payload = {
             "reasoning": "ok",
             "project_name": "cafe-latte-ordering",
-            "tech_summary": "FastAPI",
+            "tech_summary": "Next.js 14",
             "data_models": [],  # min_length=1 violation
             "api_endpoints": [{"method": "GET", "path": "/api/menu", "description": "ok", "request_body": None, "response": "ok"}],
             "ui_components": [{"name": "MenuPage", "type": "page", "description": "ok", "features": [], "data_sources": []}],
-            "file_structure": [{"path": "main.py", "purpose": "entry"}],
+            "file_structure": [{"path": "app/page.js", "purpose": "entry"}],
         }
         self.mock_client.messages.create = AsyncMock(
             side_effect=[
@@ -448,11 +448,11 @@ class TestSolutionArchitectExecute:
         invalid_payload = {
             "reasoning": "ok",
             "project_name": "cafe-latte-ordering",
-            "tech_summary": "FastAPI",
+            "tech_summary": "Next.js 14",
             "data_models": [],  # always fails
             "api_endpoints": [{"method": "GET", "path": "/api/menu", "description": "ok", "request_body": None, "response": "ok"}],
             "ui_components": [{"name": "MenuPage", "type": "page", "description": "ok", "features": [], "data_sources": []}],
-            "file_structure": [{"path": "main.py", "purpose": "entry"}],
+            "file_structure": [{"path": "app/page.js", "purpose": "entry"}],
         }
         self.mock_client.messages.create = AsyncMock(
             return_value=_make_response(invalid_payload)
@@ -1247,7 +1247,7 @@ class TestQAReviewerBuildUserPrompt:
             "code_output": self.code,
         }
         prompt = self.agent.build_user_prompt(context)
-        assert "backend/main.py" in prompt
+        assert "app/api/menu/route.js" in prompt
 
     def test_prompt_contains_api_endpoint_path(
         self, valid_finalized_config: FinalizedConfig

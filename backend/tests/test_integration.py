@@ -66,7 +66,7 @@ RA_RESPONSE = {
 SA_RESPONSE = {
     "reasoning": "Standard CRUD app with menu and order management.",
     "project_name": "cafe-ordering",
-    "tech_summary": "React frontend + Express backend + SQLite database",
+    "tech_summary": "Next.js 14 with App Router, Tailwind CSS, better-sqlite3",
     "data_models": [
         {
             "name": "MenuItem",
@@ -122,12 +122,12 @@ SA_RESPONSE = {
         },
     ],
     "file_structure": [
-        {"path": "src/pages/Menu.jsx", "purpose": "Menu display page"},
-        {"path": "src/pages/Cart.jsx", "purpose": "Cart and checkout page"},
-        {"path": "server/routes/menu.js", "purpose": "Menu API routes"},
-        {"path": "server/routes/orders.js", "purpose": "Order API routes"},
+        {"path": "app/menu/page.js", "purpose": "Menu display page"},
+        {"path": "app/cart/page.js", "purpose": "Cart and checkout page"},
+        {"path": "app/api/menu/route.js", "purpose": "Menu API route handler"},
+        {"path": "app/api/orders/route.js", "purpose": "Order API route handler"},
     ],
-    "dependencies": ["react", "express", "better-sqlite3"],
+    "dependencies": ["next", "tailwindcss", "better-sqlite3"],
 }
 
 DEV_RESPONSE = {
@@ -135,31 +135,31 @@ DEV_RESPONSE = {
     "project_name": "cafe-ordering",
     "files": [
         {
-            "path": "src/pages/Menu.jsx",
-            "content": "import React from 'react';\nexport default function Menu() { return <div>Menu</div>; }",
+            "path": "app/menu/page.js",
+            "content": "export default function Menu() { return <div className='p-4'>Menu</div>; }",
             "language": "javascript",
             "description": "Menu display page",
         },
         {
-            "path": "src/pages/Cart.jsx",
-            "content": "import React from 'react';\nexport default function Cart() { return <div>Cart</div>; }",
+            "path": "app/cart/page.js",
+            "content": "'use client';\nexport default function Cart() { return <div className='p-4'>Cart</div>; }",
             "language": "javascript",
             "description": "Cart and checkout page",
         },
         {
-            "path": "server/routes/menu.js",
-            "content": "const express = require('express');\nconst router = express.Router();\nrouter.get('/api/menu', (req, res) => res.json([]));\nmodule.exports = router;",
+            "path": "app/api/menu/route.js",
+            "content": "import { NextResponse } from 'next/server';\nexport async function GET() { return NextResponse.json([]); }",
             "language": "javascript",
-            "description": "Menu API routes",
+            "description": "Menu API route handler",
         },
         {
-            "path": "server/routes/orders.js",
-            "content": "const express = require('express');\nconst router = express.Router();\nrouter.post('/api/orders', (req, res) => res.json({id: 1}));\nmodule.exports = router;",
+            "path": "app/api/orders/route.js",
+            "content": "import { NextResponse } from 'next/server';\nexport async function POST(request) { return NextResponse.json({id: 1}); }",
             "language": "javascript",
-            "description": "Order API routes",
+            "description": "Order API route handler",
         },
     ],
-    "setup_instructions": "npm install && npm start",
+    "setup_instructions": "npm install && npm run dev",
     "features_implemented": [
         "Menu display with categories",
         "Shopping cart and checkout",

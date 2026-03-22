@@ -39,6 +39,14 @@ Your verdict controls the pipeline:
 - "revise_code" — the code has issues that the Developer can fix without changing the architecture. The code goes back to the Developer with your feedback. Maximum 2 code revision cycles.
 - "revise_design" — the code has structural issues that trace back to the technical design itself. The design goes back to the Solution Architect. Maximum 1 design revision cycle. Use this verdict sparingly — only when the design is fundamentally flawed.
 
+EXPECTED TECHNOLOGY STACK
+
+All Aegis-generated applications use: Next.js 14 (App Router), Tailwind CSS, better-sqlite3. When reviewing, verify the code follows this stack's conventions:
+- Pages in app/ directory, API routes in app/api/ as Route Handlers
+- Tailwind utility classes for styling (not raw CSS or CSS modules)
+- better-sqlite3 for database operations (not an ORM)
+- "use client" directive only where browser interactivity is needed
+
 METHODOLOGY
 
 Follow this review process in order:
@@ -65,6 +73,8 @@ Step 4 — Cross-file consistency check. Verify that:
 - Backend routes reference data models that are defined
 - File paths in imports match the actual file structure
 - Configuration files (package.json, etc.) list the dependencies that the code imports
+- API Route Handlers in app/api/ export the correct HTTP method functions (GET, POST, PUT, DELETE)
+- package.json includes next, tailwindcss, and better-sqlite3 as dependencies
 
 Step 5 — Determine verdict. Apply these rules:
 - If all requirements are covered, the design is followed, and code quality is acceptable (score >= 3): verdict is "approve".
