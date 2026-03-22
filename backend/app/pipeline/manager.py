@@ -29,6 +29,8 @@ from app.schemas.pipeline_events import (
 
 logger = logging.getLogger(__name__)
 
+_EVENT_QUEUE_SIZE = 1000
+
 
 @dataclass
 class RunnerEntry:
@@ -37,7 +39,7 @@ class RunnerEntry:
     runner: PipelineRunner
     run_id: str
     task: Optional[asyncio.Task] = None
-    event_queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=1000))
+    event_queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=_EVENT_QUEUE_SIZE))
     customer_config: Optional[CustomerConfig] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -71,10 +73,16 @@ class RunnerManager:
                     entry.run_id,
                 )
 
-            # Persist to SQLite (fire-and-forget async task)
+            # Persist to SQLite (fire-and-forget async task with error handling)
+            async def _persist_event(ev: PipelineEvent) -> None:
+                try:
+                    await repo.save_event(ev)
+                except Exception as exc:
+                    logger.error("Failed to persist event %s: %s", ev.event_id, exc)
+
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(repo.save_event(event))
+                loop.create_task(_persist_event(event))
             except RuntimeError:
                 logger.warning("No event loop for DB persist of event %s", event.event_id)
 
@@ -93,7 +101,7 @@ class RunnerManager:
         ):
             try:
                 await save_output(runner.current_run.run_id, runner.context["code_output"])
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.error("Failed to save output for run %s: %s", entry.run_id, e)
 
     async def start_run(self, config: CustomerConfig) -> str:
@@ -106,22 +114,22 @@ class RunnerManager:
         Returns the run_id.
         """
         agents = _create_agents()
-        runner = PipelineRunner(agents=agents)
 
         # Pre-create PipelineRun so we have the run_id before the task starts.
         # We then drive the runner's internal methods directly instead of calling
         # runner.run(), which would overwrite current_run with a new instance.
         pre_run = PipelineRun()
-        runner.current_run = pre_run
 
         entry = RunnerEntry(
-            runner=runner,
+            runner=None,  # Set after runner creation
             run_id=pre_run.run_id,
             customer_config=config,
         )
 
         # Wire emit callback (pushes to queue + persists to DB)
-        runner._emit = self._make_emit_callback(entry)
+        runner = PipelineRunner(agents=agents, emit_event=self._make_emit_callback(entry))
+        runner.current_run = pre_run
+        entry.runner = runner
         self._entries[entry.run_id] = entry
 
         # Persist initial run to DB
@@ -153,6 +161,7 @@ class RunnerManager:
                 logger.error("Pipeline run %s failed: %s", entry.run_id, e, exc_info=True)
 
         entry.task = asyncio.create_task(_execute())
+        entry.task.add_done_callback(self._on_task_done)
         return entry.run_id
 
     async def resume_run(self, run_id: str, answers: dict[str, str]) -> None:
@@ -178,6 +187,16 @@ class RunnerManager:
                 logger.error("Resume failed for run %s: %s", run_id, e, exc_info=True)
 
         entry.task = asyncio.create_task(_resume())
+        entry.task.add_done_callback(self._on_task_done)
+
+    @staticmethod
+    def _on_task_done(task: asyncio.Task) -> None:
+        """Log unhandled exceptions from background pipeline tasks."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error("Background pipeline task failed: %s", exc)
 
     def get_entry(self, run_id: str) -> RunnerEntry | None:
         """Look up a runner entry by run_id."""

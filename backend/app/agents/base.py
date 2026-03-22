@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Type
 
 import anthropic
 from pydantic import BaseModel, ValidationError
@@ -45,7 +45,7 @@ class BaseAgent:
         name: AgentName,
         system_prompt: str,
         output_schema: Type[BaseModel],
-        model: Optional[str] = None,
+        model: str | None = None,
     ):
         self.name = name
         self.system_prompt = system_prompt
@@ -91,7 +91,7 @@ class BaseAgent:
         ))
 
         max_attempts = 2
-        last_error: ValidationError | None = None
+        last_error: ValidationError | json.JSONDecodeError | None = None
 
         for attempt in range(max_attempts):
             # On retry, append the validation error to help the LLM self-correct
@@ -117,7 +117,7 @@ class BaseAgent:
                 ))
                 return parsed
 
-            except ValidationError as e:
+            except (ValidationError, json.JSONDecodeError) as e:
                 last_error = e
                 is_final_attempt = attempt == max_attempts - 1
 
@@ -127,7 +127,7 @@ class BaseAgent:
                         agent=self.name,
                         event_type=EventType.ERROR,
                         message=f"{self._display_name()} was unable to produce valid output.",
-                        data={"error": str(e), "raw_output": result[:500]},
+                        data={"error": str(e)},
                     ))
                     raise ValueError(
                         f"Agent {self.name.value} failed output validation after retry: {e}"

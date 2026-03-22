@@ -23,10 +23,11 @@ from app.schemas.pipeline_events import (
 
 @pytest.fixture(autouse=True)
 def mock_db():
-    """Mock database init/close for all tests."""
+    """Mock database init/close and startup validation for all tests."""
     with (
         patch("app.main.init_db", new_callable=AsyncMock),
         patch("app.main.close_db", new_callable=AsyncMock),
+        patch("app.main.settings"),
     ):
         yield
 

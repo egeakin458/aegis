@@ -180,6 +180,19 @@ def _make_response(payload: dict) -> MagicMock:
     return response
 
 
+def _make_raw_text_response(text: str) -> MagicMock:
+    """Build a mock response that returns raw text (not valid JSON)."""
+    content_block = MagicMock()
+    content_block.text = text
+    usage = MagicMock()
+    usage.input_tokens = 100
+    usage.output_tokens = 200
+    response = MagicMock()
+    response.content = [content_block]
+    response.usage = usage
+    return response
+
+
 def _event_types(events: list[PipelineEvent]) -> list[EventType]:
     return [e.event_type for e in events]
 
@@ -636,6 +649,54 @@ class TestSolutionArchitectEventEmission:
         types = _event_types(events)
         assert EventType.ERROR in types
         assert EventType.AGENT_COMPLETE not in types
+
+    @pytest.mark.asyncio
+    async def test_json_decode_error_triggers_retry(
+        self,
+        valid_finalized_config: FinalizedConfig,
+        sample_run_id: str,
+        captured_events,
+    ):
+        """When the LLM returns invalid JSON, the agent retries once."""
+        events, emit = captured_events
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _make_raw_text_response("This is not JSON at all"),
+                _make_response(_technical_design_payload()),
+            ]
+        )
+
+        result = await self.agent.execute(
+            context={"finalized_config": valid_finalized_config},
+            run_id=sample_run_id,
+            emit_event=emit,
+        )
+
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+        assert EventType.VALIDATION_FAILED in _event_types(events)
+
+    @pytest.mark.asyncio
+    async def test_json_decode_error_double_failure_raises(
+        self,
+        valid_finalized_config: FinalizedConfig,
+        sample_run_id: str,
+        captured_events,
+    ):
+        """When both attempts return invalid JSON, ValueError is raised."""
+        events, emit = captured_events
+        self.mock_client.messages.create = AsyncMock(
+            return_value=_make_raw_text_response("NOT JSON {{{")
+        )
+
+        with pytest.raises(ValueError, match="failed output validation"):
+            await self.agent.execute(
+                context={"finalized_config": valid_finalized_config},
+                run_id=sample_run_id,
+                emit_event=emit,
+            )
+
+        assert EventType.ERROR in _event_types(events)
 
 
 # ===========================================================================
@@ -1782,4 +1843,4 @@ class TestQAReviewerEventEmission:
 
         error_event = next(e for e in events if e.event_type == EventType.ERROR)
         assert "error" in error_event.data
-        assert "raw_output" in error_event.data
+        assert "raw_output" not in error_event.data

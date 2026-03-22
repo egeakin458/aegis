@@ -307,7 +307,7 @@ class PipelineRunner:
 
         if verdict == "revise_code":
             if self.code_revision_count >= settings.max_code_revision_cycles:
-                logger.warning(
+                logger.info(
                     "Code revision cap reached (%d). Accepting current output.",
                     settings.max_code_revision_cycles,
                 )
@@ -317,7 +317,7 @@ class PipelineRunner:
 
         if verdict == "revise_design":
             if self.design_revision_count >= settings.max_design_revision_cycles:
-                logger.warning(
+                logger.info(
                     "Design revision cap reached (%d). Falling back to code revision.",
                     settings.max_design_revision_cycles,
                 )

@@ -53,6 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_events_run_id ON pipeline_events(run_id);
 async def init_db(db_path: str | None = None) -> None:
     """Initialize the database: open connection and create tables."""
     global _connection
+    if _connection is not None:
+        await _connection.close()
     path = db_path or settings.database_path
     logger.info("Initializing database at %s", path)
     _connection = await aiosqlite.connect(path)

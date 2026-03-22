@@ -32,6 +32,8 @@ _TERMINAL_EVENTS = {
     EventType.PIPELINE_FAILED.value,
 }
 
+_SSE_KEEPALIVE_TIMEOUT = 30.0  # seconds between keepalive pings
+
 
 @router.post("/start", status_code=201)
 async def start_pipeline(config: CustomerConfig):
@@ -60,7 +62,7 @@ async def stream_events(run_id: str):
         async def _replay_from_db() -> AsyncGenerator[str, None]:
             events = await repo.get_events(run_id)
             for event_row in events:
-                yield json.dumps(event_row)
+                yield json.dumps(event_row, default=str)
 
         return EventSourceResponse(_replay_from_db())
 
@@ -80,7 +82,7 @@ async def stream_events(run_id: str):
         # Stream new events from the queue
         while True:
             try:
-                event = await asyncio.wait_for(entry.event_queue.get(), timeout=30.0)
+                event = await asyncio.wait_for(entry.event_queue.get(), timeout=_SSE_KEEPALIVE_TIMEOUT)
                 yield event.to_sse()
 
                 if event.event_type.value in _TERMINAL_EVENTS:
@@ -88,6 +90,16 @@ async def stream_events(run_id: str):
             except asyncio.TimeoutError:
                 # Send keepalive comment to prevent connection timeout
                 yield ": keepalive\n\n"
+
+                # Drain any events that arrived during timeout
+                while not entry.event_queue.empty():
+                    try:
+                        event = entry.event_queue.get_nowait()
+                        yield event.to_sse()
+                        if event.event_type.value in _TERMINAL_EVENTS:
+                            return
+                    except asyncio.QueueEmpty:
+                        break
 
                 # Check if pipeline ended while we were waiting
                 if runner.current_run and runner.current_run.state in (
@@ -182,5 +194,8 @@ async def get_output(run_id: str):
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Output files not found")
 
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        raise HTTPException(status_code=500, detail="Failed to read output manifest")
     return manifest

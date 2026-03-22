@@ -18,11 +18,14 @@ from app.schemas.agent_outputs import CodeOutput
 logger = logging.getLogger(__name__)
 
 
-def _sanitize_path(file_path: str) -> str:
-    """Reject paths that attempt directory traversal."""
+def _sanitize_path(file_path: str, base_dir: Path) -> Path:
+    """Reject paths that escape the base directory."""
     if file_path.startswith("/") or ".." in file_path:
         raise ValueError(f"Unsafe file path: {file_path}")
-    return file_path
+    resolved = (base_dir / file_path).resolve()
+    if not str(resolved).startswith(str(base_dir.resolve())):
+        raise ValueError(f"Path escapes output directory: {file_path}")
+    return resolved
 
 
 async def save_output(run_id: str, code_output: CodeOutput) -> Path:
@@ -35,8 +38,7 @@ async def save_output(run_id: str, code_output: CodeOutput) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for code_file in code_output.files:
-        safe_path = _sanitize_path(code_file.path)
-        file_path = output_dir / safe_path
+        file_path = _sanitize_path(code_file.path, output_dir)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(code_file.content, encoding="utf-8")
 

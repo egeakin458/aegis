@@ -1034,7 +1034,7 @@ class TestEventEmission:
 
         error_event = next(e for e in events if e.event_type == EventType.ERROR)
         assert "error" in error_event.data
-        assert "raw_output" in error_event.data
+        assert "raw_output" not in error_event.data
 
     @pytest.mark.asyncio
     async def test_double_failure_no_agent_complete_event(

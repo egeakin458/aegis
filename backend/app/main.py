@@ -4,18 +4,25 @@ Aegis — FastAPI application entry point.
 Run with: uvicorn app.main:app --reload --port 8000
 """
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as pipeline_router
+from app.config import settings
 from app.db.database import close_db, init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown hooks."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
+    settings.validate_required()
     await init_db()
     yield
     await close_db()
@@ -36,8 +43,8 @@ app.add_middleware(
         "https://*.vercel.app",   # Vercel deployments
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(pipeline_router, prefix="/api/pipeline")
