@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # Output
     output_dir: str = "outputs"  # Where generated code projects are saved
 
+    def validate_required(self) -> None:
+        """Validate that required settings are configured. Call at startup."""
+        if not self.anthropic_api_key:
+            raise ValueError(
+                "ANTHROPIC_API_KEY is not set. Add it to your .env file."
+            )
+
 
 # Singleton instance — import this wherever settings are needed
 settings = Settings()

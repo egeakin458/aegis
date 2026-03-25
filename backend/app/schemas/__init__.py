@@ -6,20 +6,27 @@ Import from this package for clean access to all schemas.
 """
 
 from .customer_config import (
+    AccessScope,
     AssumedField,
     BusinessContext,
+    BusinessSize,
     ClarificationQuestion,
     ClarificationRound,
     CustomerConfig,
     DataRequirements,
+    DataVolume,
     DesignPreferences,
+    DesignStyle,
     FeatureRequest,
     Features,
     FileUpload,
     FinalizedConfig,
+    IndustryType,
+    MobileSupport,
     ProblemStatement,
     ProjectMeta,
     TechnicalRequirements,
+    UserType,
 )
 from .agent_outputs import (
     APIEndpoint,
@@ -28,6 +35,7 @@ from .agent_outputs import (
     DataField,
     DataModel,
     FileSpec,
+    IssueSeverity,
     QAReview,
     ReviewIssue,
     ReviewVerdict,
@@ -42,9 +50,13 @@ from .pipeline_events import (
     PipelineState,
     TokenUsage,
 )
+from .ra_output import (
+    RAOutput,
+)
 from .evaluation import (
     BenchmarkTask,
     BetaFeedback,
+    ComplexityTier,
     EvaluationResult,
     JudgeScore,
 )
@@ -65,6 +77,14 @@ __all__ = [
     "ClarificationQuestion",
     "ClarificationRound",
     "AssumedField",
+    # Customer config enums
+    "IndustryType",
+    "BusinessSize",
+    "UserType",
+    "AccessScope",
+    "DesignStyle",
+    "MobileSupport",
+    "DataVolume",
     # Agent outputs
     "TechnicalDesign",
     "DataModel",
@@ -77,6 +97,9 @@ __all__ = [
     "QAReview",
     "ReviewIssue",
     "ReviewVerdict",
+    "IssueSeverity",
+    # RA output wrapper
+    "RAOutput",
     # Pipeline events
     "PipelineEvent",
     "PipelineRun",
@@ -89,4 +112,5 @@ __all__ = [
     "EvaluationResult",
     "JudgeScore",
     "BetaFeedback",
+    "ComplexityTier",
 ]
