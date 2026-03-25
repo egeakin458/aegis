@@ -3,9 +3,10 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What Is Aegis
-Aegis is a B2B virtual software company powered by a multi-agent AI pipeline. A non-technical business user fills out an intake form describing what they need, and Aegis's agent pipeline handles requirements gathering, solution design, implementation, and quality review — producing a full-stack web application.
 
-This is a senior thesis project (Izmir University of Economics, Computer Engineering). The goal is a working, demonstrable product deployed to a beta group (student + supervisor) by Week 16.
+Aegis is a multi-agent AI pipeline that operates as a virtual software company. A non-technical user submits an intake form, and four AI agents (Requirements Analyst, Solution Architect, Developer, QA Reviewer) produce a full-stack web application through structured handoffs and feedback loops.
+
+Senior thesis project — Izmir University of Economics, Computer Engineering.
 
 ## Development Commands
 
@@ -15,169 +16,154 @@ All commands run from `backend/` with the virtualenv active.
 # Setup
 cd backend
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env       # then fill in ANTHROPIC_API_KEY
+cp .env.example .env       # fill in ANTHROPIC_API_KEY
 
-# Run dev server
+# Dev server
 uvicorn app.main:app --reload --port 8000
 
-# Run all tests
-pytest tests/
-
-# Run a single test file
-pytest tests/test_schemas.py
-
-# Run a single test class or function
-pytest tests/test_schemas.py::TestCustomerConfig
-pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config
+# Tests
+pytest tests/                                              # all tests
+pytest tests/test_schemas.py                               # single file
+pytest tests/test_schemas.py::TestCustomerConfig            # single class
+pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config  # single test
 ```
 
-## Architecture Summary
+## Architecture
 
-**4 agents in a linear pipeline with feedback loops:**
-1. **Requirements Analyst** — Analyzes raw `CustomerConfig`, runs clarification loop (max 3 rounds), outputs `FinalizedConfig`
-2. **Solution Architect** — Receives `FinalizedConfig`, produces `TechnicalDesign` (data models, API specs, UI components, file structure)
-3. **Developer** — Receives `FinalizedConfig` + `TechnicalDesign`, produces `CodeOutput` (complete code files forming a runnable project)
-4. **QA Reviewer** — Receives all upstream outputs, outputs `QAReview` with verdict: `approve | revise_code | revise_design`
+### Pipeline Data Flow
 
-**Schema data flow:**
 ```
 CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev → CodeOutput → QA → QAReview
                                                                                         ↓
-                                                                          verdict: approve → done
-                                                                          verdict: revise_code → Dev (max 2 cycles)
-                                                                          verdict: revise_design → SA (max 1 cycle)
+                                                                          approve → done
+                                                                          revise_code → Dev (max 2 cycles)
+                                                                          revise_design → SA (max 1 cycle)
 ```
 
-**Default pipeline path:** RA → SA → Dev → QA → Output
+### Three-Layer Architecture
 
-**Context passing — each agent receives:**
-- **Solution Architect**: full `FinalizedConfig`
-- **Developer**: full `FinalizedConfig` + `TechnicalDesign` (RA output is summarized into the design)
-- **QA Reviewer**: full `FinalizedConfig` + `TechnicalDesign` (as reference) + `CodeOutput`
+**Layer 1 — Pipeline Engine** (`app/pipeline/runner.py`, `app/agents/`)
+The `PipelineRunner` is a state machine (~420 LOC) that orchestrates four agents. Each agent extends `BaseAgent`, which handles LLM calls, JSON parsing, Pydantic validation, and retry-on-validation-failure. Subclasses only implement `build_user_prompt(context: dict) -> str`.
+
+**Layer 2 — Lifecycle Management** (`app/pipeline/manager.py`)
+`RunnerManager` (singleton at `runner_manager`) bridges HTTP and the pipeline engine. It holds active `RunnerEntry` objects (runner + asyncio.Queue + background task), creates agents, wires event callbacks that persist to SQLite and push to SSE queues, and manages cleanup. Pipeline runs execute as `asyncio.create_task` background tasks.
+
+**Layer 3 — API & Persistence** (`app/api/routes.py`, `app/db/`)
+FastAPI routes under `/api/pipeline`. SSE streaming via `sse-starlette`. SQLite via `aiosqlite` with two tables (`pipeline_runs`, `pipeline_events`). Generated code written to `outputs/{run_id}/` with a `manifest.json`.
+
+### API Endpoints
+
+All under prefix `/api/pipeline`:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/start` | Submit `CustomerConfig`, returns `run_id` |
+| GET | `/{run_id}/events` | SSE stream — replays existing events, then live stream |
+| POST | `/{run_id}/clarification` | Submit answers to resume paused pipeline |
+| GET | `/{run_id}/status` | Current state, tokens, feedback cycles |
+| GET | `/{run_id}/output` | Generated code manifest (only when complete) |
+
+### Key Singletons and Entry Points
+
+- **App**: `app.main:app` — FastAPI instance with lifespan (init_db/close_db)
+- **Settings**: `from app.config import settings` — pydantic-settings loaded from `.env`
+- **RunnerManager**: `from app.pipeline.manager import runner_manager`
+- **DB connection**: `from app.db.database import get_connection` (must call `init_db()` first)
+
+### Agent Execution Flow
+
+`BaseAgent.execute(context, run_id, emit_event)`:
+1. Calls `build_user_prompt(context)` (subclass method)
+2. Emits `AGENT_START` event
+3. Calls Claude API via `anthropic.AsyncAnthropic` with prompt caching on system prompt
+4. Strips markdown fences, parses JSON, validates with Pydantic
+5. On `ValidationError`: re-prompts **once** with the error appended
+6. Emits `AGENT_COMPLETE` or `ERROR` event with token counts and duration
+
+### Special Schema: RAOutput
+
+The Requirements Analyst is unique — it uses `RAOutput` (not `FinalizedConfig` directly) as its output schema. `RAOutput` has a `needs_clarification` discriminator: when true, it contains questions; when false, it contains a `FinalizedConfig`. The `PipelineRunner._run_requirements()` method handles both branches.
+
+### Pipeline State Machine
+
+States: `INTAKE → REQUIREMENTS → [CLARIFICATION ↔ REQUIREMENTS] → DESIGN → DEVELOPMENT → REVIEW → COMPLETE`
+
+Clarification uses a pause-and-resume pattern: the pipeline transitions to `CLARIFICATION` state, the `PipelineRunner.run()` returns, and a later `POST /clarification` call triggers `runner.resume(answers)` which re-enters `_run_from_state(REQUIREMENTS)`.
+
+Feedback loops after QA review:
+- `revise_code` → `CODE_REVISION` → re-runs Developer with `previous_code` + `qa_review` in context → back to `REVIEW`
+- `revise_design` → `DESIGN_REVISION` → re-runs Architect with `previous_design` + `qa_review` → `DEVELOPMENT` → `REVIEW`
+
+### Event System
+
+Events flow through two paths simultaneously:
+1. **SSE queue** (`asyncio.Queue` on `RunnerEntry`) — consumed by the SSE endpoint
+2. **SQLite** (`repo.save_event`) — fire-and-forget via `asyncio.create_task`
+
+The SSE endpoint replays events already in `runner.current_run.events`, then blocks on the queue. Terminal events (`PIPELINE_COMPLETE`, `PIPELINE_FAILED`) close the stream. Keepalive pings sent every 30s.
+
+### Output Storage
+
+On pipeline completion, `save_output()` writes each `CodeFile` to `outputs/{run_id}/{path}` and creates `manifest.json`. Path traversal is blocked (`_sanitize_path` rejects `..` and absolute paths).
 
 ## Tech Stack
 
-### Aegis Platform (this repo)
 | Layer | Technology |
 |-------|-----------|
-| LLM API | Anthropic Claude API (Sonnet 4.5 primary, Haiku 4.5 for validation/eval) |
+| LLM | Anthropic Claude API (Sonnet 4.5 primary, Haiku 4.5 for validation) |
 | Backend | Python 3.12 + FastAPI |
-| Real-time | Server-Sent Events (SSE) via sse-starlette |
-| Frontend | Next.js 14+ (App Router) + Tailwind CSS + shadcn/ui |
-| Database | SQLite (state + logs) + filesystem (code artifacts) |
-| Validation | Pydantic v2 for all inter-agent message schemas |
+| Real-time | SSE via sse-starlette |
+| Frontend | Next.js 14 + Tailwind CSS + shadcn/ui |
+| Database | SQLite via aiosqlite (async) — no ORM |
+| Validation | Pydantic v2 for all schemas |
 | Deployment | Railway (backend) + Vercel (frontend) |
 
-### Generated Applications (pipeline output)
-All applications produced by the pipeline use a **fixed tech stack** to reduce variance and ensure consistent quality:
-
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 14 (App Router — not Pages Router) |
-| Styling | Tailwind CSS (utility classes, no CSS modules) |
-| Database | SQLite via better-sqlite3 (raw SQL, no ORM) |
-| Language | JavaScript (not TypeScript for prototype simplicity) |
-
-**Conventions enforced in agent prompts:**
-- Pages in `app/` directory, API route handlers in `app/api/`
-- React Server Components by default; `"use client"` only for interactive components
-- Database via `lib/db.js` using better-sqlite3
-- Config files: `package.json`, `next.config.js`, `tailwind.config.js`, `postcss.config.js`
-- Core dependencies always include: `next`, `tailwindcss`, `better-sqlite3`, `postcss`, `autoprefixer`
+**Generated apps** always use: Next.js 14 (App Router) + Tailwind CSS + better-sqlite3 + JavaScript. This is enforced in agent system prompts — agents must NOT choose alternative frameworks.
 
 ## Key Constraints
-- **Single-customer system** — no auth, no multi-user, one pipeline run at a time
-- **All inter-agent communication uses structured JSON** validated by Pydantic schemas
-- **Every agent output MUST be validated** against its Pydantic schema before being passed downstream
-- **Every pipeline event MUST be logged** to SQLite with timestamp, agent, event type, token usage, duration
-- **The observation UI is a core feature** — events must be emitted in business-friendly language, not raw logs
-- **The customer intake form is the mandatory entry point** — no pipeline runs without a validated config
-- **Custom orchestration only** — do NOT use LangChain, CrewAI, AutoGen, or any agent framework (the orchestration layer is the thesis's core intellectual contribution)
-- **Fixed output tech stack** — generated apps always use Next.js 14 (App Router) + Tailwind CSS + better-sqlite3. Agents must NOT choose alternative frameworks, styling libraries, or databases
 
-## How Agents Work
+- **Custom orchestration only** — do NOT use LangChain, CrewAI, AutoGen, or any agent framework. The orchestration layer is the thesis's core intellectual contribution.
+- **Single-customer system** — no auth, no multi-user, one pipeline run at a time expected.
+- **All inter-agent communication** uses structured JSON validated by Pydantic schemas.
+- **Every pipeline event must be logged** to SQLite and streamed via SSE in business-friendly language.
+- **Fixed generated app tech stack** — Next.js 14 App Router + Tailwind CSS + better-sqlite3. Never allow agents to choose alternatives.
 
-`BaseAgent` (`app/agents/base.py`) handles all LLM calls. Subclasses only implement `build_user_prompt(context: dict) -> str`. The base class:
-1. Emits `AGENT_START` event
-2. Calls LLM via `anthropic.AsyncAnthropic`
-3. Strips markdown fences from response, then parses JSON and validates with Pydantic
-4. On `ValidationError`: re-prompts **once** with the error message appended; raises `ValueError` if still invalid
-5. Emits `VALIDATION_PASSED` or `ERROR` event with token counts and duration
+## Testing Patterns
 
-**Creating a new agent subclass:**
+Tests live in `backend/tests/`. Key patterns from `conftest.py`:
+
+**Mocking the Anthropic client** — `mock_anthropic` fixture patches `app.agents.base.anthropic.AsyncAnthropic` so no real API calls are made. Use with `make_mock_response` to build fake LLM responses:
 ```python
-class MyAgent(BaseAgent):
-    def __init__(self):
-        super().__init__(
-            name=AgentName.MY_AGENT,
-            system_prompt="...",
-            output_schema=MyOutputModel,  # Pydantic model
-        )
-
-    def build_user_prompt(self, context: dict[str, Any]) -> str:
-        # Build user message from pipeline context
-        return "..."
+def test_my_agent(mock_anthropic, make_mock_response):
+    mock_anthropic.messages.create = AsyncMock(
+        return_value=make_mock_response({"key": "value"})
+    )
 ```
 
-The `execute()` method signature: `async execute(context, run_id, emit_event) -> BaseModel`
-- `context`: dict with upstream agent outputs
-- `run_id`: pipeline run UUID string
-- `emit_event`: callback `Callable[[PipelineEvent], None]`
+**Capturing events** — `captured_events` fixture returns `(events_list, emit_callback)`. Pass the callback as `emit_event` to `agent.execute()`.
 
-All settings come from `app/config.py` via `pydantic-settings` (loaded from `.env`). Import the singleton: `from app.config import settings`.
+**Customer config fixtures** — `valid_customer_config` and `valid_finalized_config` provide minimal valid instances for testing.
 
-## Agent System Prompt Structure
-```
-[IDENTITY] You are the {Role Name} at Aegis, a virtual software company.
-[RESPONSIBILITY] Your job is to {task}. You receive {input} and produce {output}.
-[TECHNOLOGY STACK] Fixed stack: Next.js 14 App Router, Tailwind CSS, better-sqlite3.
-[METHODOLOGY] Step-by-step process for the agent's task.
-[CONSTRAINTS] You must NOT {boundaries}. You must ALWAYS {mandatory behaviors}.
-[OUTPUT FORMAT] Your response must be valid JSON matching this exact schema: {schema}
-```
+**Database tests** — Use in-memory SQLite (`:memory:`) via `init_db(":memory:")`. Call `close_db()` in teardown.
 
-## Pipeline Event Format
-All events emitted to the frontend follow the `PipelineEvent` schema (`app/schemas/pipeline_events.py`):
-```json
-{
-  "event_id": "uuid",
-  "run_id": "uuid",
-  "timestamp": "ISO-8601",
-  "agent": "requirements_analyst | solution_architect | developer | qa_reviewer | system",
-  "event_type": "agent_start | agent_complete | clarification_needed | llm_call | error | pipeline_complete",
-  "message": "Human-readable business-language message for the UI",
-  "data": {},
-  "tokens_used": { "input": 0, "output": 0 },
-  "duration_ms": 0
-}
-```
+**API tests** — Use `httpx.AsyncClient` with FastAPI's `app`. Mock `runner_manager` methods.
 
-## Evaluation Framework
-The `app/schemas/evaluation.py` schemas and `evaluation/benchmarks/` directory support thesis evaluation:
-- **BenchmarkTask**: Predefined customer configs at 3 complexity tiers (simple/medium/complex)
-- **LLM-as-judge**: `JudgeScore` with 3 independent scoring runs per task, averaged for reliability
-- **BetaFeedback**: Structured survey from beta testers (student + supervisor)
+**Filesystem tests** — Use pytest's `tmp_path` fixture and monkeypatch `settings.output_dir`.
 
-## Important Implementation Notes
-- Use `anthropic` Python SDK for all LLM calls — do NOT use LangChain, CrewAI, or any framework
-- The PipelineRunner is a simple state machine (~300-500 LOC), not a complex framework
-- SSE uses `sse-starlette`; the frontend uses native `EventSource` API
-- SQLite via Python's built-in `sqlite3` module (plus `aiosqlite` for async) — no ORM
-- All secrets go in `.env` (gitignored), never hardcoded
-- All schemas are re-exported from `app/schemas/__init__.py` for clean imports
+## Configuration
 
-## Current Phase
-**Phase 1: Core Pipeline Engine (Weeks 4-5)**
-- [x] Project skeleton created
-- [x] Pydantic schemas defined
-- [x] Foundation verified (all fixes applied, 28 tests passing)
-- [x] Agent base class
-- [x] Requirements Analyst agent
-- [x] Solution Architect agent
-- [x] Developer agent
-- [x] QA Reviewer agent
-- [x] PipelineRunner state machine
-- [x] Integration test (full pipeline from config to output, 254 tests passing)
-- [x] Tech stack pinned to Next.js 14 + Tailwind CSS + better-sqlite3 in all agent prompts
+All settings in `app/config.py` via `pydantic-settings`, loaded from `.env`:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `anthropic_api_key` | (required) | Claude API key |
+| `primary_model` | `claude-sonnet-4-5-20250514` | Main LLM for agents |
+| `secondary_model` | `claude-haiku-4-5-20251001` | Validation/eval LLM |
+| `max_tokens` | 8192 | Max output tokens per LLM call |
+| `max_code_revision_cycles` | 2 | QA → Developer feedback cap |
+| `max_design_revision_cycles` | 1 | QA → Architect feedback cap |
+| `max_clarification_rounds` | 3 | RA clarification loop cap |
+| `database_path` | `aegis.db` | SQLite file path |
+| `output_dir` | `outputs` | Generated code output directory |
