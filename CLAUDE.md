@@ -10,25 +10,38 @@ Senior thesis project — Izmir University of Economics, Computer Engineering.
 
 ## Development Commands
 
-All commands run from `backend/` with the virtualenv active.
+### Backend (run from `backend/` with virtualenv active)
 
 ```bash
-# Setup
 cd backend
-python -m venv venv
-source venv/bin/activate
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env       # fill in ANTHROPIC_API_KEY
+cp .env.example .env          # fill in ANTHROPIC_API_KEY
 
-# Dev server
 uvicorn app.main:app --reload --port 8000
 
-# Tests
-pytest tests/                                              # all tests
-pytest tests/test_schemas.py                               # single file
-pytest tests/test_schemas.py::TestCustomerConfig            # single class
-pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config  # single test
+pytest tests/                                                              # all tests
+pytest tests/test_schemas.py                                               # single file
+pytest tests/test_schemas.py::TestCustomerConfig                           # single class
+pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config      # single test
 ```
+
+### Frontend (run from `frontend/`)
+
+```bash
+cd frontend
+cp .env.example .env.local    # set NEXT_PUBLIC_API_URL=http://localhost:8000
+
+npm run dev                   # http://localhost:3000
+npm run build                 # type-check + production build
+npm test                      # Jest unit tests (mappers)
+npx jest --testPathPattern="config.test"   # single test file
+
+# Regenerate TypeScript types from live backend (backend must be running)
+npm run gen:types
+```
+
+Dev harness (visual states without a real run): `http://localhost:3000/dev/entries`
 
 ## Architecture
 
@@ -107,6 +120,59 @@ The SSE endpoint replays events already in `runner.current_run.events`, then blo
 ### Output Storage
 
 On pipeline completion, `save_output()` writes each `CodeFile` to `outputs/{run_id}/{path}` and creates `manifest.json`. Path traversal is blocked (`_sanitize_path` rejects `..` and absolute paths).
+
+## Frontend Architecture
+
+The frontend (`frontend/`) is a Next.js 14 App Router app that consumes the backend SSE stream and renders a live pipeline dashboard.
+
+### Key Data Flows
+
+**Form → Backend**: `IntakeModal` (7 sections, react-hook-form + zod) → `lib/mappers/config.ts:mapFormToCustomerConfig()` → `POST /api/pipeline/start` → `run_id`. All enum conversions happen in the mapper (display strings like `"Clean & Minimal"` → backend values like `"clean_minimal"`).
+
+**SSE → UI state**: `lib/api/sse.ts` wraps `@microsoft/fetch-event-source` (not native `EventSource` — needed for proper connection lifecycle). `lib/hooks/use-pipeline.ts` runs a `useReducer` that dedupes events by `event_id`, maps each `EventType` to a `ConsoleEntry`, and derives `OrbitPhase` from the stream. URL param `?run={id}` enables refresh-safe replay — on mount the hook opens SSE against the existing run; the backend replays all stored events; the reducer dedupes.
+
+**Clarification pause/resume**: `CLARIFICATION_NEEDED` surfaces a `ClarificationCard` with a submittable form. Submit hits `POST /api/pipeline/{run_id}/clarification`. The SSE stream stays open throughout (backend pauses, does not close the stream).
+
+**Output**: On `PIPELINE_COMPLETE`, the hook fetches `GET /api/pipeline/{run_id}/output` and populates the `OutputViewer` drawer. The manifest includes inline file content (requires the backend modification in `output_storage.py` described below).
+
+### Frontend Directory Map
+
+```
+frontend/
+  app/
+    page.tsx                  main page (TopBar + AgentOrbit + ConsolePane + IntakeModal)
+    dev/entries/page.tsx      dev harness — every orbit phase + console entry variant
+  components/
+    agent-orbit/              SVG orbit with framer-motion animations
+    console/entries/          10 entry-type components (agent-start → summary)
+    intake-modal/
+      sections/               7 form sections
+      widgets/                SegmentedToggle, MultiSelectChips, TagInput, ColorPicker, FeatureList
+    top-bar/                  StatusPill, StatusStrip
+    output-viewer/            (Phase 5) file tree + content drawer
+    ui/                       shadcn-generated primitives
+  lib/
+    types/ui.ts               OrbitPhase, ConsoleEntry union, PipelineState
+    schemas/intake-form.ts    zod schema + IntakeFormValues type + defaults
+    mappers/config.ts         mapFormToCustomerConfig() — all enum round-trips
+    mappers/events.ts         (Phase 3) PipelineEvent → ConsoleEntry
+    mappers/phase.ts          (Phase 3) event stream → OrbitPhase
+    api/client.ts             (Phase 3) typed fetch wrappers
+    api/sse.ts                (Phase 3) fetch-event-source wrapper
+    hooks/use-pipeline.ts     (Phase 3) main reducer hook
+    utils/format.ts           formatTokens, formatElapsed, formatRelativeTime
+    utils/generated/schema.d.ts  openapi-typescript output (committed)
+```
+
+### Design Tokens
+
+All in `tailwind.config.ts` under `theme.extend.colors.aegis`:
+`bg=#0f172a`, `accent=#22d3ee`, `amber=#f59e0b`, `emerald=#10b981`, `error=#ef4444`, `purple=#9333ea`, `indigo=#4f46e5`
+
+### Pending Backend Modifications (Phase 5)
+
+- `backend/app/pipeline/output_storage.py` — add `"content": file.content` to each file dict in the manifest so the OutputViewer can render files without per-file endpoints.
+- `backend/app/api/routes.py` — add `GET /{run_id}/output/download` returning a ZIP via `zipfile` + `StreamingResponse`.
 
 ## Tech Stack
 
