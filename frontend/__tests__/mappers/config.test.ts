@@ -17,8 +17,8 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['21–50', '21-50'],
     ['50+', '50+'],
   ])('businessSize %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, businessSize: input as any })
-    expect(result.business_context.business_size).toBe(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, businessSize: input as never })
+    expect(result.business_context.size).toBe(expected)
   })
 
   test.each([
@@ -30,7 +30,7 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['Manufacturing', 'manufacturing'],
     ['Other', 'other'],
   ])('industry %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, industry: input as any })
+    const result = mapFormToCustomerConfig({ ...BASE, industry: input as never })
     expect(result.business_context.industry).toBe(expected)
   })
 
@@ -41,8 +41,8 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     [['All Users'], ['all']],
     [['Owner', 'Customers'], ['owner', 'customers']],
   ])('targetUsers %j → %j', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, targetUsers: input as any })
-    expect(result.business_context.target_users).toEqual(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, targetUsers: input as never })
+    expect(result.problem_statement.users).toEqual(expected)
   })
 
   test.each([
@@ -51,8 +51,8 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['1,000–10,000', '1000-10000'],
     ['10,000+', '10000+'],
   ])('dataVolume %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, dataVolume: input as any })
-    expect(result.data_requirements.data_volume).toBe(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, dataVolume: input as never })
+    expect(result.data.volume).toBe(expected)
   })
 
   test.each([
@@ -61,8 +61,8 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['Modern & Colorful', 'modern_colorful'],
     ['No Preference', 'no_preference'],
   ])('visualStyle %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, visualStyle: input as any })
-    expect(result.design_preferences.visual_style).toBe(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, visualStyle: input as never })
+    expect(result.design.style).toBe(expected)
   })
 
   test.each([
@@ -70,8 +70,8 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['No', 'no'],
     ['Nice to Have', 'nice_to_have'],
   ])('mobileSupport %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, mobileSupport: input as any })
-    expect(result.design_preferences.mobile_support).toBe(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, mobileSupport: input as never })
+    expect(result.technical.mobile).toBe(expected)
   })
 
   test.each([
@@ -79,22 +79,42 @@ describe('mapFormToCustomerConfig — enum round-trips', () => {
     ['Team / Network', 'team_network'],
     ['Anyone on the Internet', 'anyone_internet'],
   ])('accessScope %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, accessScope: input as any })
-    expect(result.technical_requirements.access_scope).toBe(expected)
+    const result = mapFormToCustomerConfig({ ...BASE, accessScope: input as never })
+    expect(result.technical.access_scope).toBe(expected)
   })
 
   test('deadline ISO conversion', () => {
     const result = mapFormToCustomerConfig({ ...BASE, deadline: '2026-06-01' })
-    expect(result.project_meta.deadline).toMatch(/^2026-06-01T/)
+    expect(result.meta.deadline).toMatch(/^2026-06-01T/)
   })
 
   test('null deadline stays null', () => {
     const result = mapFormToCustomerConfig({ ...BASE, deadline: null })
-    expect(result.project_meta.deadline).toBeNull()
+    expect(result.meta.deadline).toBeNull()
   })
 
-  test('file_uploads always empty array', () => {
+  test('uploads always empty array', () => {
     const result = mapFormToCustomerConfig(BASE)
-    expect(result.data_requirements.file_uploads).toEqual([])
+    expect(result.data.uploads).toEqual([])
+  })
+
+  test('mustHaveFeatures mapped to features.requested', () => {
+    const result = mapFormToCustomerConfig({
+      ...BASE,
+      mustHaveFeatures: [{ id: '1', name: 'Login', description: 'User login', priority: 1 }],
+    })
+    expect(result.features.requested[0].description).toContain('Login')
+    expect(result.features.requested[0].priority).toBe(1)
+  })
+
+  test('niceToHaveFeatures appended after mustHave with higher priority', () => {
+    const result = mapFormToCustomerConfig({
+      ...BASE,
+      mustHaveFeatures: [{ id: '1', name: 'Login', description: '', priority: 1 }],
+      niceToHaveFeatures: ['Dark mode'],
+    })
+    expect(result.features.requested).toHaveLength(2)
+    expect(result.features.requested[1].description).toBe('Dark mode')
+    expect(result.features.requested[1].priority).toBeGreaterThan(result.features.requested[0].priority)
   })
 })

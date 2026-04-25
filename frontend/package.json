@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "jest",
     "gen:types": "openapi-typescript http://localhost:8000/openapi.json -o lib/utils/generated/schema.d.ts"
   },
   "dependencies": {

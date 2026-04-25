@@ -1,48 +1,5 @@
 import type { IntakeFormValues } from '@/lib/schemas/intake-form'
-
-// Target type matches CustomerConfig backend schema exactly
-export interface CustomerConfig {
-  business_context: {
-    company_name: string
-    industry: string
-    business_size: string
-    target_users: string[]
-  }
-  problem_statement: {
-    current_situation: string
-    desired_outcome: string
-    pain_points: string[]
-  }
-  features: {
-    must_have: Array<{ name: string; description: string; priority: number }>
-    nice_to_have: string[]
-  }
-  data_requirements: {
-    data_types: string[]
-    file_uploads: never[]
-    data_volume: string
-    external_integrations: string[]
-  }
-  design_preferences: {
-    visual_style: string
-    color_preferences: string[]
-    mobile_support: string
-    accessibility_requirements: string[]
-    example_sites: string[]
-  }
-  technical_requirements: {
-    access_scope: string
-    performance_requirements: string[]
-    security_requirements: string[]
-    compliance_requirements: never[]
-  }
-  project_meta: {
-    project_name: string
-    deadline: string | null
-    budget_range: string | null
-    additional_context: string | null
-  }
-}
+import type { CustomerConfig } from '@/lib/utils/generated/schema'
 
 const INDUSTRY_MAP: Record<string, string> = {
   'Retail': 'retail',
@@ -95,50 +52,60 @@ const ACCESS_SCOPE_MAP: Record<string, string> = {
 }
 
 export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig {
+  const mustHave = form.mustHaveFeatures.map((f, i) => ({
+    description: f.name + (f.description ? ': ' + f.description : ''),
+    priority: f.priority ?? i + 1,
+  }))
+  const niceToHave = form.niceToHaveFeatures.map((desc, i) => ({
+    description: desc,
+    priority: mustHave.length + i + 1,
+  }))
+
+  const entityParts: string[] = []
+  if (form.dataTypes.length > 0) entityParts.push(form.dataTypes.join(', '))
+  if (form.externalIntegrations.length > 0) entityParts.push('integrations: ' + form.externalIntegrations.join(', '))
+  const entities = entityParts.length > 0 ? entityParts.join('; ') : 'Application data'
+
+  const painPointsStr = form.painPoints.length > 0 ? form.painPoints.join('. ') : null
+
   return {
     business_context: {
-      company_name: form.companyName,
-      industry: INDUSTRY_MAP[form.industry] ?? form.industry,
-      business_size: BUSINESS_SIZE_MAP[form.businessSize] ?? form.businessSize,
-      target_users: form.targetUsers.map(u => USER_TYPE_MAP[u] ?? u),
+      name: form.companyName,
+      industry: (INDUSTRY_MAP[form.industry] ?? form.industry) as CustomerConfig['business_context']['industry'],
+      industry_other: form.industry === 'Other' ? form.companyName : null,
+      description: form.currentSituation,
+      size: (BUSINESS_SIZE_MAP[form.businessSize] ?? form.businessSize) as CustomerConfig['business_context']['size'],
     },
     problem_statement: {
-      current_situation: form.currentSituation,
-      desired_outcome: form.desiredOutcome,
-      pain_points: form.painPoints,
+      problem: [form.currentSituation, form.desiredOutcome].filter(Boolean).join(' → '),
+      users: form.targetUsers.map(u => (USER_TYPE_MAP[u] ?? u) as CustomerConfig['problem_statement']['users'][number]),
+      current_process: painPointsStr,
     },
     features: {
-      must_have: form.mustHaveFeatures.map(f => ({
-        name: f.name,
-        description: f.description,
-        priority: f.priority,
-      })),
-      nice_to_have: form.niceToHaveFeatures,
+      requested: [...mustHave, ...niceToHave],
     },
-    data_requirements: {
-      data_types: form.dataTypes,
-      file_uploads: [],
-      data_volume: DATA_VOLUME_MAP[form.dataVolume] ?? form.dataVolume,
-      external_integrations: form.externalIntegrations,
+    data: {
+      entities,
+      has_existing_data: false,
+      uploads: [],
+      volume: (DATA_VOLUME_MAP[form.dataVolume] ?? form.dataVolume) as CustomerConfig['data']['volume'],
     },
-    design_preferences: {
-      visual_style: VISUAL_STYLE_MAP[form.visualStyle] ?? form.visualStyle,
-      color_preferences: form.colorPreferences,
-      mobile_support: MOBILE_SUPPORT_MAP[form.mobileSupport] ?? form.mobileSupport,
-      accessibility_requirements: form.accessibilityRequirements,
-      example_sites: form.exampleSites,
+    design: {
+      colors: form.colorPreferences.length > 0 ? form.colorPreferences : null,
+      logo: null,
+      references: [],
+      style: (VISUAL_STYLE_MAP[form.visualStyle] ?? form.visualStyle) as CustomerConfig['design']['style'],
     },
-    technical_requirements: {
-      access_scope: ACCESS_SCOPE_MAP[form.accessScope] ?? form.accessScope,
-      performance_requirements: form.performanceRequirements,
-      security_requirements: form.securityRequirements,
-      compliance_requirements: [],
+    technical: {
+      access_scope: (ACCESS_SCOPE_MAP[form.accessScope] ?? form.accessScope) as CustomerConfig['technical']['access_scope'],
+      auth_required: true,
+      user_roles: null,
+      mobile: (MOBILE_SUPPORT_MAP[form.mobileSupport] ?? form.mobileSupport) as CustomerConfig['technical']['mobile'],
     },
-    project_meta: {
-      project_name: form.projectName,
+    meta: {
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
-      budget_range: form.budgetRange,
-      additional_context: form.additionalContext,
+      notes: form.additionalContext ?? null,
+      submitted_at: new Date().toISOString(),
     },
   }
 }

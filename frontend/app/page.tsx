@@ -1,42 +1,50 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { TopBar } from '@/components/top-bar'
 import { AgentOrbit } from '@/components/agent-orbit'
 import { ConsolePane } from '@/components/console'
 import { IntakeModal } from '@/components/intake-modal'
-import type { OrbitPhase, ConsoleEntry } from '@/lib/types/ui'
+import { usePipeline } from '@/lib/hooks/use-pipeline'
+import { useElapsed } from '@/lib/hooks/use-elapsed'
 
-const SAMPLE_ENTRIES: ConsoleEntry[] = [
-  { id: '1', type: 'agent-start', agent: 'ra', agentLabel: 'Requirements Analyst', timestamp: '10:00:01' },
-  { id: '2', type: 'progress-update', agent: 'ra', text: 'Analyzing business context...', timestamp: '10:00:02' },
-  { id: '3', type: 'config-finalized', agent: 'ra', projectSummary: 'A retail inventory management system for small businesses.', assumptions: ['Web-based, mobile-responsive', 'SQLite database', 'Up to 1000 products'], timestamp: '10:00:10' },
-  { id: '4', type: 'agent-complete', agent: 'ra', agentLabel: 'Requirements Analyst', tokensUsed: 2800, durationMs: 9000, timestamp: '10:00:10' },
-  { id: '5', type: 'agent-start', agent: 'sa', agentLabel: 'Solution Architect', timestamp: '10:00:11' },
-]
-
-export default function Home() {
-  const [phase] = useState<OrbitPhase>('sa-running')
+function PipelineApp() {
   const [modalOpen, setModalOpen] = useState(false)
+  const { state, startRun, submitClarification } = usePipeline()
+  const frozen = state.phase === 'complete' || state.phase === 'error'
+  const elapsedMs = useElapsed(state.startTime, frozen)
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopBar
-        phase={phase}
-        totalTokens={2800}
-        elapsedMs={11000}
+        phase={state.phase}
+        totalTokens={state.totalTokens}
+        elapsedMs={elapsedMs}
         onNewProject={() => setModalOpen(true)}
       />
       <main className="flex flex-1 overflow-hidden">
-        {/* Left: Orbit */}
         <div className="w-[460px] shrink-0 flex items-center justify-center border-r border-slate-800/50 py-8">
-          <AgentOrbit phase={phase} />
+          <AgentOrbit phase={state.phase} />
         </div>
-        {/* Right: Console */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <ConsolePane entries={SAMPLE_ENTRIES} />
+          <ConsolePane
+            entries={state.entries}
+            onClarificationSubmit={submitClarification}
+          />
         </div>
       </main>
-      <IntakeModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <IntakeModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={startRun}
+      />
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f172a]" />}>
+      <PipelineApp />
+    </Suspense>
   )
 }
