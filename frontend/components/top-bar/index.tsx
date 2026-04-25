@@ -8,9 +8,11 @@ interface Props {
   elapsedMs: number
   isReplay?: boolean
   onNewProject?: () => void
+  onStartOver?: () => void
 }
 
-export function TopBar({ phase, totalTokens, elapsedMs, isReplay, onNewProject }: Props) {
+export function TopBar({ phase, totalTokens, elapsedMs, isReplay, onNewProject, onStartOver }: Props) {
+  const hasRun = phase !== 'idle'
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-sm sticky top-0 z-10">
       <div className="flex items-center gap-3">
@@ -28,6 +30,14 @@ export function TopBar({ phase, totalTokens, elapsedMs, isReplay, onNewProject }
       />
       <div className="flex items-center gap-3">
         <StatusPill phase={phase} />
+        {hasRun && onStartOver && (
+          <button
+            onClick={onStartOver}
+            className="px-4 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+          >
+            Start Over
+          </button>
+        )}
         <button
           onClick={onNewProject}
           className="px-4 py-1.5 text-xs font-medium rounded-lg bg-[#22d3ee] text-[#0f172a] hover:bg-cyan-300 transition-colors"
