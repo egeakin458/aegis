@@ -6,7 +6,7 @@ import { startPipeline, submitClarification as apiSubmitClarification, getOutput
 import { mapEventToEntry } from '@/lib/mappers/events'
 import { derivePhase } from '@/lib/mappers/phase'
 import type { SSEHandle } from '@/lib/api/sse'
-import type { PipelineEvent, CustomerConfig, OutputManifest } from '@/lib/utils/generated/schema'
+import type { PipelineEvent, CustomerConfig, OutputManifest } from '@/lib/types/api'
 import type { OrbitPhase, ConsoleEntry, ConnectionState } from '@/lib/types/ui'
 
 interface State {

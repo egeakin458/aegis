@@ -1,5 +1,5 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import type { PipelineEvent } from '@/lib/utils/generated/schema'
+import type { PipelineEvent } from '@/lib/types/api'
 import type { ConnectionState } from '@/lib/types/ui'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'

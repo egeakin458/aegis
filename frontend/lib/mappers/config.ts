@@ -1,5 +1,14 @@
 import type { IntakeFormValues } from '@/lib/schemas/intake-form'
-import type { CustomerConfig } from '@/lib/utils/generated/schema'
+import type {
+  CustomerConfig,
+  IndustryType,
+  BusinessSize,
+  UserType,
+  DataVolume,
+  DesignStyle,
+  MobileSupport,
+  AccessScope,
+} from '@/lib/types/api'
 
 const INDUSTRY_MAP: Record<string, string> = {
   'Retail': 'retail',
@@ -71,14 +80,14 @@ export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig 
   return {
     business_context: {
       name: form.companyName,
-      industry: (INDUSTRY_MAP[form.industry] ?? form.industry) as CustomerConfig['business_context']['industry'],
+      industry: (INDUSTRY_MAP[form.industry] ?? form.industry) as IndustryType,
       industry_other: form.industry === 'Other' ? form.companyName : null,
       description: form.currentSituation,
-      size: (BUSINESS_SIZE_MAP[form.businessSize] ?? form.businessSize) as CustomerConfig['business_context']['size'],
+      size: (BUSINESS_SIZE_MAP[form.businessSize] ?? form.businessSize) as BusinessSize,
     },
     problem_statement: {
       problem: [form.currentSituation, form.desiredOutcome].filter(Boolean).join(' → '),
-      users: form.targetUsers.map(u => (USER_TYPE_MAP[u] ?? u) as CustomerConfig['problem_statement']['users'][number]),
+      users: form.targetUsers.map(u => (USER_TYPE_MAP[u] ?? u) as UserType),
       current_process: painPointsStr,
     },
     features: {
@@ -88,19 +97,19 @@ export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig 
       entities,
       has_existing_data: false,
       uploads: [],
-      volume: (DATA_VOLUME_MAP[form.dataVolume] ?? form.dataVolume) as CustomerConfig['data']['volume'],
+      volume: (DATA_VOLUME_MAP[form.dataVolume] ?? form.dataVolume) as DataVolume,
     },
     design: {
       colors: form.colorPreferences.length > 0 ? form.colorPreferences : null,
       logo: null,
       references: [],
-      style: (VISUAL_STYLE_MAP[form.visualStyle] ?? form.visualStyle) as CustomerConfig['design']['style'],
+      style: (VISUAL_STYLE_MAP[form.visualStyle] ?? form.visualStyle) as DesignStyle,
     },
     technical: {
-      access_scope: (ACCESS_SCOPE_MAP[form.accessScope] ?? form.accessScope) as CustomerConfig['technical']['access_scope'],
+      access_scope: (ACCESS_SCOPE_MAP[form.accessScope] ?? form.accessScope) as AccessScope,
       auth_required: true,
       user_roles: null,
-      mobile: (MOBILE_SUPPORT_MAP[form.mobileSupport] ?? form.mobileSupport) as CustomerConfig['technical']['mobile'],
+      mobile: (MOBILE_SUPPORT_MAP[form.mobileSupport] ?? form.mobileSupport) as MobileSupport,
     },
     meta: {
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,

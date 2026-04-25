@@ -4,11 +4,13 @@ import { TopBar } from '@/components/top-bar'
 import { AgentOrbit } from '@/components/agent-orbit'
 import { ConsolePane } from '@/components/console'
 import { IntakeModal } from '@/components/intake-modal'
+import { OutputViewer } from '@/components/output-viewer'
 import { usePipeline } from '@/lib/hooks/use-pipeline'
 import { useElapsed } from '@/lib/hooks/use-elapsed'
 
 function PipelineApp() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const { state, startRun, submitClarification } = usePipeline()
   const frozen = state.phase === 'complete' || state.phase === 'error'
   const elapsedMs = useElapsed(state.startTime, frozen)
@@ -29,6 +31,7 @@ function PipelineApp() {
           <ConsolePane
             entries={state.entries}
             onClarificationSubmit={submitClarification}
+            onViewFiles={() => setViewerOpen(true)}
           />
         </div>
       </main>
@@ -36,6 +39,12 @@ function PipelineApp() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSubmit={startRun}
+      />
+      <OutputViewer
+        manifest={state.output}
+        runId={state.runId}
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
       />
     </div>
   )

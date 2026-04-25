@@ -53,6 +53,7 @@ async def save_output(run_id: str, code_output: CodeOutput) -> Path:
                 "path": f.path,
                 "language": f.language,
                 "description": f.description,
+                "content": f.content,
             }
             for f in code_output.files
         ],

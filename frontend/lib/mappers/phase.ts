@@ -1,4 +1,4 @@
-import type { PipelineEvent } from '@/lib/utils/generated/schema'
+import type { PipelineEvent } from '@/lib/types/api'
 import type { OrbitPhase } from '@/lib/types/ui'
 
 export function derivePhase(

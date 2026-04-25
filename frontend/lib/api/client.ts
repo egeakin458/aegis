@@ -1,4 +1,4 @@
-import type { CustomerConfig, StartRunResponse, OutputManifest } from '@/lib/utils/generated/schema'
+import type { CustomerConfig, StartRunResponse, OutputManifest } from '@/lib/types/api'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const API = `${BASE_URL}/api/pipeline`

@@ -1,4 +1,4 @@
-import type { PipelineEvent } from '@/lib/utils/generated/schema'
+import type { PipelineEvent } from '@/lib/types/api'
 import type { ConsoleEntry, AgentId } from '@/lib/types/ui'
 
 const AGENT_ID_MAP: Record<string, AgentId | 'sys'> = {
