@@ -96,7 +96,15 @@ function reducer(state: State, action: Action): State {
       const phase = derivePhase(state.phase, event, lastRevisionType)
 
       const entry = mapEventToEntry(event, totalTokens)
-      const entries = entry ? [...state.entries, entry] : state.entries
+      let entries = entry ? [...state.entries, entry] : state.entries
+
+      // On replay: CLARIFICATION_RECEIVED marks the most recent unsubmitted clarification as done
+      if (event.event_type === 'clarification_received') {
+        const lastId = [...entries].reverse().find(e => e.type === 'clarification' && !e.submitted)?.id
+        if (lastId) {
+          entries = entries.map(e => e.id === lastId ? { ...e, submitted: true } : e)
+        }
+      }
 
       return {
         ...state,
