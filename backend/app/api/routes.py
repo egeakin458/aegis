@@ -8,12 +8,15 @@ submitting clarification answers, and retrieving results.
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
+import zipfile
 from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.config import settings
@@ -199,3 +202,25 @@ async def get_output(run_id: str):
     except (json.JSONDecodeError, OSError) as e:
         raise HTTPException(status_code=500, detail="Failed to read output manifest")
     return manifest
+
+
+@router.get("/{run_id}/output/download")
+async def download_output(run_id: str):
+    """Stream a ZIP archive of all generated files for a completed run."""
+    output_dir = Path(settings.output_dir) / run_id
+    if not output_dir.exists():
+        raise HTTPException(status_code=404, detail="Output files not found")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in output_dir.rglob("*"):
+            if file_path.is_file() and file_path.name != "manifest.json":
+                arcname = file_path.relative_to(output_dir)
+                zf.write(file_path, arcname)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=\"{run_id}.zip\""},
+    )

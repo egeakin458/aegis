@@ -10,25 +10,39 @@ Senior thesis project — Izmir University of Economics, Computer Engineering.
 
 ## Development Commands
 
-All commands run from `backend/` with the virtualenv active.
+### Backend (run from `backend/` with virtualenv active)
 
 ```bash
-# Setup
 cd backend
-python -m venv venv
-source venv/bin/activate
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env       # fill in ANTHROPIC_API_KEY
+cp .env.example .env          # fill in ANTHROPIC_API_KEY
 
-# Dev server
 uvicorn app.main:app --reload --port 8000
 
-# Tests
-pytest tests/                                              # all tests
-pytest tests/test_schemas.py                               # single file
-pytest tests/test_schemas.py::TestCustomerConfig            # single class
-pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config  # single test
+pytest tests/                                                              # all tests
+pytest tests/test_schemas.py                                               # single file
+pytest tests/test_schemas.py::TestCustomerConfig                           # single class
+pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config      # single test
 ```
+
+### Frontend (run from `frontend/`)
+
+```bash
+cd frontend
+cp .env.example .env.local    # set NEXT_PUBLIC_API_URL=http://localhost:8000
+
+npm run dev                   # http://localhost:3000
+npm run build                 # type-check + production build
+npm run lint                  # ESLint
+npm test                      # Jest unit tests (mappers)
+npx jest --testPathPattern="config.test"   # single test file
+
+# Regenerate TypeScript types from live backend (backend must be running)
+npm run gen:types
+```
+
+Dev harness (visual states without a real run): `http://localhost:3000/dev/entries`
 
 ## Architecture
 
@@ -108,6 +122,76 @@ The SSE endpoint replays events already in `runner.current_run.events`, then blo
 
 On pipeline completion, `save_output()` writes each `CodeFile` to `outputs/{run_id}/{path}` and creates `manifest.json`. Path traversal is blocked (`_sanitize_path` rejects `..` and absolute paths).
 
+## Frontend Architecture
+
+The frontend (`frontend/`) is a Next.js 14 App Router app that consumes the backend SSE stream and renders a live pipeline dashboard.
+
+### Key Data Flows
+
+**Form → Backend**: `IntakeModal` (7 sections, react-hook-form + zod) → `lib/mappers/config.ts:mapFormToCustomerConfig()` → `POST /api/pipeline/start` → `run_id`. All enum conversions happen in the mapper (display strings like `"Clean & Minimal"` → backend values like `"clean_minimal"`).
+
+**SSE → UI state**: `lib/api/sse.ts` wraps `@microsoft/fetch-event-source` (not native `EventSource` — needed for proper connection lifecycle). `lib/hooks/use-pipeline.ts` runs a `useReducer` that dedupes events by `event_id`, maps each `EventType` to a `ConsoleEntry`, and derives `OrbitPhase` from the stream. URL param `?run={id}` enables refresh-safe replay — on mount the hook opens SSE against the existing run; the backend replays all stored events; the reducer dedupes.
+
+**Clarification pause/resume**: `CLARIFICATION_NEEDED` surfaces a `ClarificationCard` with a submittable form. Submit hits `POST /api/pipeline/{run_id}/clarification`. The SSE stream stays open throughout (backend pauses, does not close the stream).
+
+**Output**: On `PIPELINE_COMPLETE`, the hook fetches `GET /api/pipeline/{run_id}/output` and populates the `OutputViewer` drawer. The manifest includes inline file content (requires the backend modification in `output_storage.py` described below).
+
+### Frontend Directory Map
+
+```
+frontend/
+  app/
+    page.tsx                  main page (TopBar + AgentOrbit + ConsolePane + IntakeModal)
+    dev/entries/page.tsx      dev harness — every orbit phase + console entry variant
+  components/
+    agent-orbit/              SVG orbit with framer-motion animations (hero element)
+      index.tsx               CANVAS=560, C=280, R=190 — derives node positions from C/R
+      agent-node.tsx          r=30 nodes, double-pulse rings, per-node glow filter, readable labels
+      arcs.tsx                ambient 60s idle rotation, emerald trail, comet+tail, strokeWidth=2
+      center-panel.tsx        foreignObject + AnimatePresence crossfade on phase change
+    console/entries/          10 entry-type components (agent-start → summary)
+    intake-modal/
+      sections/               7 form sections
+      widgets/                SegmentedToggle, MultiSelectChips, TagInput, ColorPicker, FeatureList
+    top-bar/                  StatusPill, StatusStrip
+    output-viewer/            (Phase 5) file tree + content drawer
+    ui/                       shadcn-generated primitives
+  lib/
+    types/ui.ts               OrbitPhase, ConsoleEntry union, PipelineState
+    schemas/intake-form.ts    zod schema + IntakeFormValues type + defaults
+    mappers/config.ts         mapFormToCustomerConfig() — all enum round-trips
+    mappers/events.ts         (Phase 3) PipelineEvent → ConsoleEntry
+    mappers/phase.ts          (Phase 3) event stream → OrbitPhase
+    api/client.ts             (Phase 3) typed fetch wrappers
+    api/sse.ts                (Phase 3) fetch-event-source wrapper
+    hooks/use-pipeline.ts     (Phase 3) main reducer hook
+    utils/format.ts           formatTokens, formatElapsed, formatRelativeTime
+    utils/generated/schema.d.ts  openapi-typescript output (committed)
+```
+
+### AgentOrbit — Design Notes
+
+The orbit is the **primary hero element**. Key design decisions:
+- **Layout**: orbit column is `lg:flex-[0_0_560px]` with a faint radial cyan gradient background; hard border removed
+- **Canvas**: 560×560 SVG, center (280,280), orbit radius 190
+- **Nodes**: `r=30`, double-pulse rings on active/waiting (second ring delayed 0.6s), per-node `node-glow-{agent}` Gaussian filter when active, complete bg `#064e35` (distinguishable from idle `#1e293b`)
+- **Arcs**: base stroke `#1e3a4a` at 2px; active arc `#22d3ee` fully opaque at 2.5px; emerald trail (`#10b981`, opacity 0.35) on completed segments; comet `r=5` with ghost tail `r=3 delay=0.15s`
+- **Idle rotation**: `OrbitArcs` wraps arcs in `motion.g` that does a 60s 360° rotation when `activeSegment === null`, stops when pipeline runs
+- **Center panel**: 65px frosted containment circle + `<foreignObject>` with `AnimatePresence` crossfade (0.25s) on every phase transition; subtitle 11px `#94a3b8`
+
+### Intake Form — Pending Refactor
+
+The current form (7 sections, `components/intake-modal/sections/`) has ~8 zod fields that don't exist in `CustomerConfig` and several structural mismatches with the research doc spec (`docs/Aegis_Research_Decisions_Plan.md` §4.4). Work needed:
+
+- **Schema** (`lib/schemas/intake-form.ts`): remove orphaned fields, add `description`, `entities`, `has_existing_data`, `auth_required`, `user_roles`; consolidate split fields
+- **Mapper** (`lib/mappers/config.ts`): remove workaround concatenations once schema is clean
+- **Sections**: industry → Select dropdown; problem → single textarea; features → single priority list; data → TagInput + toggle; technical → add auth toggle + userRoles; timeline → remove projectName/budgetRange
+
+### Design Tokens
+
+All in `tailwind.config.ts` under `theme.extend.colors.aegis`:
+`bg=#0f172a`, `accent=#22d3ee`, `amber=#f59e0b`, `emerald=#10b981`, `error=#ef4444`, `purple=#9333ea`, `indigo=#4f46e5`
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -159,7 +243,7 @@ All settings in `app/config.py` via `pydantic-settings`, loaded from `.env`:
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `anthropic_api_key` | (required) | Claude API key |
-| `primary_model` | `claude-sonnet-4-5-20250514` | Main LLM for agents |
+| `primary_model` | `claude-sonnet-4-6` | Main LLM for agents |
 | `secondary_model` | `claude-haiku-4-5-20251001` | Validation/eval LLM |
 | `max_tokens` | 8192 | Max output tokens per LLM call |
 | `max_code_revision_cycles` | 2 | QA → Developer feedback cap |
