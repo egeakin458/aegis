@@ -4,9 +4,9 @@ import { OrbitArcs } from './arcs'
 import { CenterPanel } from './center-panel'
 import type { AgentId, OrbitPhase } from '@/lib/types/ui'
 
-const CANVAS = 460
-const C = 230
-const R = 155
+const CANVAS = 560
+const C = 280
+const R = 190
 
 // Agents placed at cardinal positions
 const NODE_POSITIONS: Record<AgentId, { x: number; y: number }> = {

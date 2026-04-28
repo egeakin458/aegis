@@ -46,7 +46,10 @@ function PipelineApp() {
       />
       {/* Responsive: stacks vertically below lg (1024px), side-by-side above */}
       <main className="flex flex-1 overflow-hidden flex-col lg:flex-row">
-        <div className="lg:w-[460px] lg:shrink-0 flex items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-800/50 py-8">
+        <div
+          className="lg:flex-[0_0_560px] flex items-center justify-center border-b lg:border-b-0 lg:border-r border-transparent py-8"
+          style={{ background: 'radial-gradient(ellipse at center, rgba(34,211,238,0.05) 0%, transparent 70%)' }}
+        >
           <AgentOrbit phase={state.phase} />
         </div>
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -68,7 +71,7 @@ function PipelineApp() {
         open={viewerOpen}
         onClose={() => setViewerOpen(false)}
       />
-      <ConnectionLostPill state={state.connectionState} />
+      <ConnectionLostPill state={state.connectionState} hasRun={state.runId !== null} />
     </div>
   )
 }

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Anthropic API
     anthropic_api_key: str = ""
-    primary_model: str = "claude-sonnet-4-5-20250514"
+    primary_model: str = "claude-sonnet-4-6"
     secondary_model: str = "claude-haiku-4-5-20251001"
     max_tokens: int = 8192
     api_timeout: int = 120  # seconds

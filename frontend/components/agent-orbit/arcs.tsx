@@ -32,26 +32,45 @@ const ARCS = [
 
 export function OrbitArcs({ cx, cy, r, activeSegment }: Props) {
   return (
-    <g>
+    <motion.g
+      style={{ transformOrigin: `${cx}px ${cy}px` }}
+      animate={{ rotate: activeSegment === null ? 360 : 0 }}
+      transition={{ duration: 60, repeat: activeSegment === null ? Infinity : 0, ease: 'linear' }}
+    >
       {ARCS.map((arc, i) => {
         const d = arcPath(cx, cy, r, arc.start, arc.end)
         const isActive = activeSegment === i
+        const isCompleted = activeSegment !== null && i < activeSegment
         return (
           <g key={i}>
+            {/* Completed arc trail */}
+            {isCompleted && (
+              <path d={d} fill="none" stroke="#10b981" strokeWidth={1.5} opacity={0.35} />
+            )}
             {/* Base arc */}
-            <path d={d} fill="none" stroke="#1e293b" strokeWidth={1.5} />
+            <path d={d} fill="none" stroke="#1e3a4a" strokeWidth={2} />
             {/* Active arc */}
             {isActive && (
               <>
-                <path d={d} fill="none" stroke="#22d3ee" strokeWidth={1.5} opacity={0.6} />
+                <path d={d} fill="none" stroke="#22d3ee" strokeWidth={2.5} />
                 {/* Comet */}
                 <motion.circle
-                  r={3}
+                  r={5}
                   fill="#22d3ee"
                   filter="url(#comet-glow)"
                   initial={{ offsetDistance: '0%' } as any}
                   animate={{ offsetDistance: '100%' } as any}
                   transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                  style={{ offsetPath: `path("${d}")` } as any}
+                />
+                {/* Comet tail */}
+                <motion.circle
+                  r={3}
+                  fill="#22d3ee"
+                  opacity={0.4}
+                  initial={{ offsetDistance: '0%' } as any}
+                  animate={{ offsetDistance: '100%' } as any}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'linear', delay: 0.15 }}
                   style={{ offsetPath: `path("${d}")` } as any}
                 />
               </>
@@ -61,10 +80,10 @@ export function OrbitArcs({ cx, cy, r, activeSegment }: Props) {
       })}
       <defs>
         <filter id="comet-glow">
-          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feGaussianBlur stdDeviation="4" result="blur" />
           <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-    </g>
+    </motion.g>
   )
 }

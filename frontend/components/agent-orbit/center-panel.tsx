@@ -1,3 +1,5 @@
+'use client'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { OrbitPhase } from '@/lib/types/ui'
 
 const MESSAGES: Record<OrbitPhase, { title: string; sub: string }> = {
@@ -17,8 +19,22 @@ export function CenterPanel({ phase, cx, cy }: { phase: OrbitPhase; cx: number; 
   const { title, sub } = MESSAGES[phase]
   return (
     <g>
-      <text x={cx} y={cy - 8} textAnchor="middle" fontSize={14} fontWeight={700} fill="#f1f5f9">{title}</text>
-      <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="#64748b">{sub}</text>
+      <circle r={65} cx={cx} cy={cy} fill="rgba(15,23,42,0.75)" stroke="#1e3a4a" strokeWidth={1} />
+      <foreignObject x={cx - 75} y={cy - 32} width={150} height={64}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={phase}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25 }}
+            style={{ textAlign: 'center', fontFamily: 'inherit' }}
+          >
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9', lineHeight: 1.3 }}>{title}</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', lineHeight: 1.4 }}>{sub}</div>
+          </motion.div>
+        </AnimatePresence>
+      </foreignObject>
     </g>
   )
 }
