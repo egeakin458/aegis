@@ -187,6 +187,35 @@ def _event_types(events: list[PipelineEvent]) -> list[EventType]:
 
 
 # ===========================================================================
+# 0. Handler registry — every runnable state has a registered handler
+# ===========================================================================
+
+
+class TestHandlerRegistry:
+    """Verify the state → handler registry is complete and raises on unknown states."""
+
+    def test_every_runnable_state_has_handler(self, valid_finalized_config):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        non_runnable = {
+            PipelineState.INTAKE,
+            PipelineState.CLARIFICATION,
+            PipelineState.COMPLETE,
+            PipelineState.FAILED,
+        }
+        runnable = set(PipelineState) - non_runnable
+        assert runnable == set(runner._state_handlers.keys())
+
+    @pytest.mark.asyncio
+    async def test_unknown_state_raises(self, valid_finalized_config):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        runner.current_run = MagicMock()
+        runner.current_run.state = PipelineState.INTAKE
+        runner._state_handlers.clear()
+        with pytest.raises(ValueError, match="No handler registered for state"):
+            await runner._run_from_state(PipelineState.REQUIREMENTS)
+
+
+# ===========================================================================
 # 1. Happy path — full pipeline to COMPLETE
 # ===========================================================================
 
