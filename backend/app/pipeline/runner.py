@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
 
 from app.agents.base import BaseAgent
@@ -77,6 +77,15 @@ class PipelineRunner:
         self.clarification_history: list[ClarificationRound] = []
         self.code_revision_count: int = 0
         self.design_revision_count: int = 0
+
+        self._state_handlers: dict[PipelineState, Callable[[], Awaitable[PipelineState]]] = {
+            PipelineState.REQUIREMENTS: self._run_requirements,
+            PipelineState.DESIGN: self._run_design,
+            PipelineState.DEVELOPMENT: self._run_development,
+            PipelineState.REVIEW: self._run_review,
+            PipelineState.CODE_REVISION: self._run_code_revision,
+            PipelineState.DESIGN_REVISION: self._run_design_revision,
+        }
 
     def emit_event(self, event: PipelineEvent) -> None:
         """Emit an event and add it to the run log."""
@@ -155,20 +164,10 @@ class PipelineRunner:
         while state not in (PipelineState.COMPLETE, PipelineState.FAILED, PipelineState.CLARIFICATION):
             self._transition(state)
 
-            if state == PipelineState.REQUIREMENTS:
-                state = await self._run_requirements()
-            elif state == PipelineState.DESIGN:
-                state = await self._run_design()
-            elif state == PipelineState.DEVELOPMENT:
-                state = await self._run_development()
-            elif state == PipelineState.REVIEW:
-                state = await self._run_review()
-            elif state == PipelineState.CODE_REVISION:
-                state = await self._run_code_revision()
-            elif state == PipelineState.DESIGN_REVISION:
-                state = await self._run_design_revision()
-            else:
-                raise ValueError(f"Unexpected state: {state}")
+            handler = self._state_handlers.get(state)
+            if handler is None:
+                raise ValueError(f"No handler registered for state: {state}")
+            state = await handler()
 
         # Handle terminal states
         if state == PipelineState.COMPLETE:
