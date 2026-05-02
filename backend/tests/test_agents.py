@@ -121,8 +121,8 @@ def _code_output_payload() -> dict:
         ],
         "setup_instructions": "npm install && npm run dev",
         "features_implemented": [
-            "Menu display with categories",
-            "Shopping cart and checkout",
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "description": "Menu display with categories", "implementation_notes": None},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "description": "Shopping cart and checkout", "implementation_notes": None},
         ],
         "known_limitations": [],
     }
@@ -134,10 +134,10 @@ def _qa_review_payload(verdict: str = "approve") -> dict:
         "reasoning": "The implementation covers all stated requirements with good quality.",
         "verdict": verdict,
         "issues": [],
-        "requirements_coverage": {
-            "Menu display with categories": True,
-            "Shopping cart and checkout": True,
-        },
+        "requirements_coverage": [
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "MenuPage component renders menu items"},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": True, "evidence": "Cart and checkout pages implemented"},
+        ],
         "code_quality_score": 4,
         "summary": "Your application has been built and reviewed. Everything looks good.",
     }
@@ -158,10 +158,10 @@ def _qa_review_with_issues_payload(verdict: str = "revise_code") -> dict:
                 "suggestion": "Wrap the database call in a try-except and return HTTP 500 on failure.",
             }
         ],
-        "requirements_coverage": {
-            "Menu display with categories": True,
-            "Shopping cart and checkout": False,
-        },
+        "requirements_coverage": [
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "Menu page present"},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": False, "evidence": "Checkout not implemented"},
+        ],
         "code_quality_score": 2,
         "summary": "The application needs some fixes before it is ready for delivery.",
     }
@@ -940,7 +940,7 @@ class TestDeveloperExecute:
             emit_event=emit,
         )
 
-        assert "Menu display with categories" in result.features_implemented
+        assert any(f.description == "Menu display with categories" for f in result.features_implemented)
 
     @pytest.mark.asyncio
     async def test_execute_retries_on_schema_validation_failure(
@@ -1457,8 +1457,8 @@ class TestQAReviewerExecute:
             emit_event=emit,
         )
 
-        assert isinstance(result.requirements_coverage, dict)
-        assert result.requirements_coverage["Menu display with categories"] is True
+        assert isinstance(result.requirements_coverage, list)
+        assert any(c.feature_id == "feat_menu-display-with-categories_a1b2c3" and c.implemented is True for c in result.requirements_coverage)
 
     @pytest.mark.asyncio
     async def test_execute_revise_code_result_has_one_issue(

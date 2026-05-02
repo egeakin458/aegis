@@ -57,7 +57,7 @@ def single_file_code_output() -> CodeOutput:
             )
         ],
         setup_instructions="npm install && npm run dev",
-        features_implemented=["Feature A"],
+        features_implemented=[{"feature_id": "feat_feature-a_a1b2c3", "description": "Feature A", "implementation_notes": None}],
     )
 
 
@@ -94,7 +94,7 @@ def multi_file_code_output() -> CodeOutput:
             ),
         ],
         setup_instructions="npm install && npm run dev",
-        features_implemented=["Order listing", "Database setup"],
+        features_implemented=[{"feature_id": "feat_order-listing_a1b2c3", "description": "Order listing", "implementation_notes": None}, {"feature_id": "feat_database-setup_a1b2c3", "description": "Database setup", "implementation_notes": None}],
         known_limitations=["No authentication"],
     )
 
@@ -177,7 +177,7 @@ class TestFileContent:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["feature"],
+            features_implemented=[{"feature_id": "feat_feature_a1b2c3", "description": "feature", "implementation_notes": None}],
         )
         await save_output(sample_run_id, code_output)
         written = (tmp_path / sample_run_id / "file.txt").read_text(encoding="utf-8")
@@ -214,7 +214,7 @@ class TestFileContent:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["unicode support"],
+            features_implemented=[{"feature_id": "feat_unicode-support_a1b2c3", "description": "unicode support", "implementation_notes": None}],
         )
         await save_output(sample_run_id, code_output)
         written = (tmp_path / sample_run_id / "index.js").read_text(encoding="utf-8")
@@ -273,7 +273,8 @@ class TestManifestCreation:
         manifest = json.loads(
             (tmp_path / sample_run_id / "manifest.json").read_text(encoding="utf-8")
         )
-        assert manifest["features_implemented"] == ["Feature A"]
+        assert manifest["features_implemented"][0]["feature_id"] == "feat_feature-a_a1b2c3"
+        assert manifest["features_implemented"][0]["description"] == "Feature A"
 
     @pytest.mark.asyncio
     async def test_manifest_contains_files_list(
@@ -373,7 +374,7 @@ class TestNestedPaths:
                 )
             ],
             setup_instructions="npm install",
-            features_implemented=["menu api"],
+            features_implemented=[{"feature_id": "feat_menu-api_a1b2c3", "description": "menu api", "implementation_notes": None}],
         )
         await save_output(sample_run_id, code_output)
         assert (tmp_path / sample_run_id / "app" / "api" / "menu" / "route.js").exists()
@@ -394,7 +395,7 @@ class TestNestedPaths:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["deep nesting"],
+            features_implemented=[{"feature_id": "feat_deep-nesting_a1b2c3", "description": "deep nesting", "implementation_notes": None}],
         )
         await save_output(sample_run_id, code_output)
         assert (tmp_path / sample_run_id / "a" / "b" / "c" / "d" / "e" / "deep.js").exists()
@@ -415,7 +416,7 @@ class TestNestedPaths:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["routing"],
+            features_implemented=[{"feature_id": "feat_routing_a1b2c3", "description": "routing", "implementation_notes": None}],
         )
         await save_output(sample_run_id, code_output)
         manifest = json.loads(
@@ -444,7 +445,7 @@ class TestUnsafePathAbsolute:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["security bypass"],
+            features_implemented=[{"feature_id": "feat_security-bypass_a1b2c3", "description": "security bypass", "implementation_notes": None}],
         )
         with pytest.raises(ValueError, match="Unsafe file path"):
             await save_output(sample_run_id, code_output)
@@ -465,7 +466,7 @@ class TestUnsafePathAbsolute:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["home page"],
+            features_implemented=[{"feature_id": "feat_home-page_a1b2c3", "description": "home page", "implementation_notes": None}],
         )
         with pytest.raises(ValueError, match="Unsafe file path"):
             await save_output(sample_run_id, code_output)
@@ -486,7 +487,7 @@ class TestUnsafePathAbsolute:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["none"],
+            features_implemented=[{"feature_id": "feat_none_a1b2c3", "description": "none", "implementation_notes": None}],
         )
         with pytest.raises(ValueError):
             await save_output(sample_run_id, code_output)
@@ -514,7 +515,7 @@ class TestUnsafePathTraversal:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["traversal"],
+            features_implemented=[{"feature_id": "feat_traversal_a1b2c3", "description": "traversal", "implementation_notes": None}],
         )
         with pytest.raises(ValueError, match="Unsafe file path"):
             await save_output(sample_run_id, code_output)
@@ -533,7 +534,7 @@ class TestUnsafePathTraversal:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["traversal"],
+            features_implemented=[{"feature_id": "feat_traversal_a1b2c3", "description": "traversal", "implementation_notes": None}],
         )
         with pytest.raises(ValueError, match="Unsafe file path"):
             await save_output(sample_run_id, code_output)
@@ -552,7 +553,7 @@ class TestUnsafePathTraversal:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["none"],
+            features_implemented=[{"feature_id": "feat_none_a1b2c3", "description": "none", "implementation_notes": None}],
         )
         with pytest.raises(ValueError, match="Unsafe file path"):
             await save_output(sample_run_id, code_output)
@@ -574,7 +575,7 @@ class TestUnsafePathTraversal:
                 )
             ],
             setup_instructions="none",
-            features_implemented=["logo display"],
+            features_implemented=[{"feature_id": "feat_logo-display_a1b2c3", "description": "logo display", "implementation_notes": None}],
         )
         # Should not raise
         await save_output(sample_run_id, code_output)

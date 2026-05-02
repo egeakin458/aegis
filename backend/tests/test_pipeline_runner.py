@@ -134,7 +134,9 @@ def _make_code_output() -> CodeOutput:
             )
         ],
         setup_instructions="npm install && npm run dev",
-        features_implemented=["Order listing"],
+        features_implemented=[
+            {"feature_id": "feat_order-listing_a1b2c3", "description": "Order listing", "implementation_notes": None}
+        ],
         known_limitations=[],
     )
 
@@ -144,7 +146,9 @@ def _make_qa_review(verdict: ReviewVerdict = ReviewVerdict.APPROVE) -> QAReview:
         reasoning="Looks good.",
         verdict=verdict,
         issues=[],
-        requirements_coverage={"Order listing": True},
+        requirements_coverage=[
+            {"feature_id": "feat_order-listing_a1b2c3", "implemented": True, "evidence": "Order list page implemented"}
+        ],
         code_quality_score=4,
         summary="Code meets requirements.",
     )
