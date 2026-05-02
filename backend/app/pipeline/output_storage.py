@@ -47,7 +47,7 @@ async def save_output(run_id: str, code_output: CodeOutput) -> Path:
         "project_name": code_output.project_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "setup_instructions": code_output.setup_instructions,
-        "features_implemented": code_output.features_implemented,
+        "features_implemented": [f.model_dump(mode="json") for f in code_output.features_implemented],
         "files": [
             {
                 "path": f.path,

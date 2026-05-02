@@ -75,7 +75,7 @@ def minimal_customer_config() -> CustomerConfig:
         features=Features(
             requested=[FeatureRequest(description="Test feature", priority=1)]
         ),
-        data=DataRequirements(entities="None"),
+        data=DataRequirements(entities=[]),
     )
 
 

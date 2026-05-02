@@ -17,13 +17,15 @@ Coverage:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.agents.base import BaseAgent
 from app.pipeline.runner import PipelineRunner
 from app.schemas.agent_outputs import (
+    BuildCheckResult,
+    BuildCheckIssue,
     APIEndpoint,
     CodeFile,
     CodeOutput,
@@ -47,6 +49,22 @@ from app.schemas.pipeline_events import (
     TokenUsage,
 )
 from app.schemas.ra_output import RAOutput
+
+
+# ===========================================================================
+# Module-level autouse fixture — mock build checker to pass by default
+# ===========================================================================
+
+
+@pytest.fixture(autouse=True)
+def mock_build_check_pass():
+    """Patch run_build_check to return a passing result for all runner tests.
+
+    Build-checker-specific tests override this with their own patch.
+    """
+    passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+    with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+        yield
 
 
 # ===========================================================================
@@ -134,7 +152,9 @@ def _make_code_output() -> CodeOutput:
             )
         ],
         setup_instructions="npm install && npm run dev",
-        features_implemented=["Order listing"],
+        features_implemented=[
+            {"feature_id": "feat_order-listing_a1b2c3", "description": "Order listing", "implementation_notes": None}
+        ],
         known_limitations=[],
     )
 
@@ -144,7 +164,9 @@ def _make_qa_review(verdict: ReviewVerdict = ReviewVerdict.APPROVE) -> QAReview:
         reasoning="Looks good.",
         verdict=verdict,
         issues=[],
-        requirements_coverage={"Order listing": True},
+        requirements_coverage=[
+            {"feature_id": "feat_order-listing_a1b2c3", "implemented": True, "evidence": "Order list page implemented"}
+        ],
         code_quality_score=4,
         summary="Code meets requirements.",
     )
@@ -184,6 +206,35 @@ def _agents_for_happy_path(valid_finalized_config: FinalizedConfig) -> dict[str,
 
 def _event_types(events: list[PipelineEvent]) -> list[EventType]:
     return [e.event_type for e in events]
+
+
+# ===========================================================================
+# 0. Handler registry — every runnable state has a registered handler
+# ===========================================================================
+
+
+class TestHandlerRegistry:
+    """Verify the state → handler registry is complete and raises on unknown states."""
+
+    def test_every_runnable_state_has_handler(self, valid_finalized_config):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        non_runnable = {
+            PipelineState.INTAKE,
+            PipelineState.CLARIFICATION,
+            PipelineState.COMPLETE,
+            PipelineState.FAILED,
+        }
+        runnable = set(PipelineState) - non_runnable
+        assert runnable == set(runner._state_handlers.keys())
+
+    @pytest.mark.asyncio
+    async def test_unknown_state_raises(self, valid_finalized_config):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        runner.current_run = MagicMock()
+        runner.current_run.state = PipelineState.INTAKE
+        runner._state_handlers.clear()
+        with pytest.raises(ValueError, match="No handler registered for state"):
+            await runner._run_from_state(PipelineState.REQUIREMENTS)
 
 
 # ===========================================================================
@@ -1484,3 +1535,331 @@ class TestPipelineRunnerInit:
         # run is now COMPLETE, not CLARIFICATION
         with pytest.raises(ValueError, match="CLARIFICATION"):
             await runner.resume(answers={})
+
+
+# ===========================================================================
+# PIPELINE_PARTIAL — revision cap emits partial event instead of complete
+# ===========================================================================
+
+
+class TestPipelinePartialEvent:
+    """When a revision cap is hit, PIPELINE_PARTIAL is emitted (not PIPELINE_COMPLETE)."""
+
+    def _agents_with_always_revise_code(self, valid_finalized_config: FinalizedConfig) -> dict:
+        qa = MagicMock(
+            spec=BaseAgent,
+            execute=AsyncMock(return_value=_make_qa_review(ReviewVerdict.REVISE_CODE)),
+        )
+        return {
+            "requirements_analyst": _make_mock_agent(
+                AgentName.REQUIREMENTS_ANALYST,
+                _make_finalized_ra_output(valid_finalized_config),
+            ),
+            "solution_architect": _make_mock_agent(
+                AgentName.SOLUTION_ARCHITECT, _make_technical_design()
+            ),
+            "developer": _make_mock_agent(AgentName.DEVELOPER, _make_code_output()),
+            "qa_reviewer": qa,
+        }
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_emits_pipeline_partial_not_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        event_types = _event_types(result.events)
+        assert EventType.PIPELINE_PARTIAL in event_types
+        assert EventType.PIPELINE_COMPLETE not in event_types
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_outcome_is_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        assert result.outcome == "partial"
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_state_is_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_happy_path_emits_pipeline_complete_not_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        event_types = _event_types(result.events)
+        assert EventType.PIPELINE_COMPLETE in event_types
+        assert EventType.PIPELINE_PARTIAL not in event_types
+
+
+# ===========================================================================
+# 11. BUILD_CHECK state transitions
+# ===========================================================================
+
+
+def _make_build_fail_result(n_errors: int = 1) -> BuildCheckResult:
+    return BuildCheckResult(
+        passed=False,
+        duration_ms=10,
+        files_checked=3,
+        issues=[
+            BuildCheckIssue(
+                file="app/page.js",
+                severity="error",
+                message="SyntaxError: Unexpected token",
+                check="syntax_js",
+            )
+            for _ in range(n_errors)
+        ],
+    )
+
+
+class TestBuildCheck:
+    """Verify BUILD_CHECK state transitions: pass → REVIEW, fail → CODE_REVISION → pass → REVIEW."""
+
+    @pytest.mark.asyncio
+    async def test_build_check_pass_transitions_to_review(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check passes, QA Reviewer should be called once (normal flow)."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        assert result.state == PipelineState.COMPLETE
+        agents["qa_reviewer"].execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_build_check_pass_emits_build_check_start_and_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        agents = _agents_for_happy_path(valid_finalized_config)
+        passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        event_types = _event_types(result.events)
+        assert EventType.BUILD_CHECK_START in event_types
+        assert EventType.BUILD_CHECK_COMPLETE in event_types
+        assert EventType.BUILD_CHECK_FAILED not in event_types
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_triggers_code_revision(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check fails and cap not reached, Developer is called again."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        # First call fails, second passes
+        call_count = {"n": 0}
+
+        async def _side_effect(_co):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return _make_build_fail_result()
+            return BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        # Developer called twice: initial + code revision
+        assert agents["developer"].execute.call_count == 2
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_emits_build_check_failed_event(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        agents = _agents_for_happy_path(valid_finalized_config)
+
+        async def _side_effect(_co):
+            return _make_build_fail_result()
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents, emit_event=lambda e: None)
+            # cap will be reached after 2 revisions → partial
+            result = await runner.run(valid_customer_config)
+
+        event_types = _event_types(result.events)
+        assert EventType.BUILD_CHECK_FAILED in event_types
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_at_cap_marks_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check always fails and cap is exhausted, outcome is partial."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        always_fail = BuildCheckResult(passed=False, duration_ms=10, files_checked=3, issues=[
+            BuildCheckIssue(file="app/page.js", severity="error", message="SyntaxError", check="syntax_js")
+        ])
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=always_fail)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        assert result.outcome == "partial"
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_build_check_context_includes_build_check_result_on_revision(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """Developer receives build_check_result in context during code revision."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        call_count = {"n": 0}
+        received_context: list[dict] = []
+
+        original_execute = agents["developer"].execute.side_effect
+
+        async def _capture_context(ctx, *args, **kwargs):
+            received_context.append(dict(ctx))
+            return _make_code_output()
+
+        agents["developer"].execute = AsyncMock(side_effect=_capture_context)
+
+        async def _side_effect(_co):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return _make_build_fail_result()
+            return BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents)
+            await runner.run(valid_customer_config)
+
+        # Second call (code revision) should have build_check_result in context
+        assert len(received_context) >= 2
+        assert "build_check_result" in received_context[1]
+        assert received_context[1]["build_check_result"].passed is False
+
+
+# ===========================================================================
+# 12. CodePatch revision cycle
+# ===========================================================================
+
+
+def _make_code_patch(
+    files_to_replace: list | None = None,
+    files_to_delete: list | None = None,
+) -> "CodePatch":
+    from app.schemas.agent_outputs import CodePatch as _CodePatch
+    return _CodePatch(
+        reasoning="Fixed the issues.",
+        files_to_replace=files_to_replace or [
+            CodeFile(
+                path="app/orders/page.js",
+                content="export default function OrderList() { return <div>Fixed</div>; }",
+                language="javascript",
+                description="Fixed page",
+            )
+        ],
+        files_to_delete=files_to_delete or [],
+        features_implemented_delta=[],
+    )
+
+
+class TestCodePatchRevision:
+    """Verify Developer emits CodePatch on revision and runner merges it correctly."""
+
+    @pytest.mark.asyncio
+    async def test_code_patch_merged_into_code_output(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """After a revision cycle, context["code_output"] reflects the merged patch."""
+        code_revision_done = {"n": 0}
+        code_output_after_revision: list = []
+
+        original_qa_output_seq = [
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ]
+        qa_side_effects = iter(original_qa_output_seq)
+
+        async def _capture_and_patch(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                code_revision_done["n"] += 1
+                return _make_code_patch()
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_capture_and_patch)
+        agents["qa_reviewer"].execute = AsyncMock(side_effect=lambda ctx, *a, **kw: next(qa_side_effects))
+
+        runner = PipelineRunner(agents=agents)
+        result = await runner.run(valid_customer_config)
+
+        assert code_revision_done["n"] == 1
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_code_patch_replaces_file_content(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """The file content in the merged CodeOutput reflects the patch's replacement."""
+        qa_side_effects = iter([
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ])
+
+        async def _dev_side_effect(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                return _make_code_patch(files_to_replace=[
+                    CodeFile(
+                        path="app/orders/page.js",
+                        content="// PATCHED CONTENT",
+                        language="javascript",
+                        description="Patched file",
+                    )
+                ])
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_dev_side_effect)
+        agents["qa_reviewer"].execute = AsyncMock(
+            side_effect=lambda ctx, *a, **kw: next(qa_side_effects)
+        )
+
+        runner = PipelineRunner(agents=agents)
+        await runner.run(valid_customer_config)
+
+        final_code = runner.context["code_output"]
+        patched_file = next(f for f in final_code.files if f.path == "app/orders/page.js")
+        assert patched_file.content == "// PATCHED CONTENT"
+
+    @pytest.mark.asyncio
+    async def test_code_patch_emits_file_generated_events_with_action(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """FILE_GENERATED events during patch apply include an action discriminator."""
+        events: list = []
+        qa_side_effects = iter([
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ])
+
+        async def _dev_side_effect(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                return _make_code_patch()
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_dev_side_effect)
+        agents["qa_reviewer"].execute = AsyncMock(
+            side_effect=lambda ctx, *a, **kw: next(qa_side_effects)
+        )
+
+        runner = PipelineRunner(agents=agents, emit_event=events.append)
+        await runner.run(valid_customer_config)
+
+        file_gen_events = [e for e in events if e.event_type == EventType.FILE_GENERATED]
+        actions = {e.data.get("action") for e in file_gen_events}
+        assert actions & {"created", "updated"}  # at least one patch file action

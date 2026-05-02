@@ -27,6 +27,7 @@ class EventType(str, Enum):
     # Pipeline lifecycle
     PIPELINE_STARTED = "pipeline_started"
     PIPELINE_COMPLETE = "pipeline_complete"
+    PIPELINE_PARTIAL = "pipeline_partial"
     PIPELINE_FAILED = "pipeline_failed"
 
     # Agent lifecycle
@@ -54,6 +55,11 @@ class EventType(str, Enum):
     FILE_GENERATED = "file_generated"
     PROGRESS_UPDATE = "progress_update"
 
+    # Build verification
+    BUILD_CHECK_START = "build_check_start"
+    BUILD_CHECK_COMPLETE = "build_check_complete"
+    BUILD_CHECK_FAILED = "build_check_failed"
+
     # Errors
     ERROR = "error"
 
@@ -65,6 +71,7 @@ class PipelineState(str, Enum):
     CLARIFICATION = "clarification"
     DESIGN = "design"
     DEVELOPMENT = "development"
+    BUILD_CHECK = "build_check"
     REVIEW = "review"
     CODE_REVISION = "code_revision"
     DESIGN_REVISION = "design_revision"

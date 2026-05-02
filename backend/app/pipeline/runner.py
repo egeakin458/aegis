@@ -22,11 +22,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
 
 from app.agents.base import BaseAgent
 from app.config import settings
+from app.pipeline.build_checker import run_build_check
+from app.pipeline.patch import apply_patch
+from app.schemas.agent_outputs import CodeOutput, CodePatch
 from app.schemas.customer_config import (
     ClarificationRound,
     CustomerConfig,
@@ -77,6 +80,16 @@ class PipelineRunner:
         self.clarification_history: list[ClarificationRound] = []
         self.code_revision_count: int = 0
         self.design_revision_count: int = 0
+
+        self._state_handlers: dict[PipelineState, Callable[[], Awaitable[PipelineState]]] = {
+            PipelineState.REQUIREMENTS: self._run_requirements,
+            PipelineState.DESIGN: self._run_design,
+            PipelineState.DEVELOPMENT: self._run_development,
+            PipelineState.BUILD_CHECK: self._run_build_check,
+            PipelineState.REVIEW: self._run_review,
+            PipelineState.CODE_REVISION: self._run_code_revision,
+            PipelineState.DESIGN_REVISION: self._run_design_revision,
+        }
 
     def emit_event(self, event: PipelineEvent) -> None:
         """Emit an event and add it to the run log."""
@@ -155,32 +168,30 @@ class PipelineRunner:
         while state not in (PipelineState.COMPLETE, PipelineState.FAILED, PipelineState.CLARIFICATION):
             self._transition(state)
 
-            if state == PipelineState.REQUIREMENTS:
-                state = await self._run_requirements()
-            elif state == PipelineState.DESIGN:
-                state = await self._run_design()
-            elif state == PipelineState.DEVELOPMENT:
-                state = await self._run_development()
-            elif state == PipelineState.REVIEW:
-                state = await self._run_review()
-            elif state == PipelineState.CODE_REVISION:
-                state = await self._run_code_revision()
-            elif state == PipelineState.DESIGN_REVISION:
-                state = await self._run_design_revision()
-            else:
-                raise ValueError(f"Unexpected state: {state}")
+            handler = self._state_handlers.get(state)
+            if handler is None:
+                raise ValueError(f"No handler registered for state: {state}")
+            state = await handler()
 
         # Handle terminal states
         if state == PipelineState.COMPLETE:
             self._transition(PipelineState.COMPLETE)
             self.current_run.completed_at = datetime.now(timezone.utc)
-            self.current_run.outcome = self.current_run.outcome or "success"
-            self.emit_event(PipelineEvent(
-                run_id=self.current_run.run_id,
-                agent=AgentName.SYSTEM,
-                event_type=EventType.PIPELINE_COMPLETE,
-                message="Your application is ready! Here's what we built.",
-            ))
+            if self.current_run.outcome == "partial":
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.SYSTEM,
+                    event_type=EventType.PIPELINE_PARTIAL,
+                    message="We built as much as we could within review cycles. Here's what was completed.",
+                ))
+            else:
+                self.current_run.outcome = "success"
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.SYSTEM,
+                    event_type=EventType.PIPELINE_COMPLETE,
+                    message="Your application is ready! Here's what we built.",
+                ))
         elif state == PipelineState.CLARIFICATION:
             self._transition(PipelineState.CLARIFICATION)
             # Pipeline pauses — will be resumed via resume()
@@ -282,7 +293,54 @@ class PipelineRunner:
         )
 
         self.context["code_output"] = result
-        return PipelineState.REVIEW
+        return PipelineState.BUILD_CHECK
+
+    async def _run_build_check(self) -> PipelineState:
+        """Run syntax + structural verification on generated code."""
+        code_output = self.context["code_output"]
+
+        self.emit_event(PipelineEvent(
+            run_id=self.current_run.run_id,
+            agent=AgentName.SYSTEM,
+            event_type=EventType.BUILD_CHECK_START,
+            message="Verifying the generated code structure and syntax.",
+        ))
+
+        result = await run_build_check(code_output)
+        self.context["build_check_result"] = result
+
+        if result.passed:
+            self.emit_event(PipelineEvent(
+                run_id=self.current_run.run_id,
+                agent=AgentName.SYSTEM,
+                event_type=EventType.BUILD_CHECK_COMPLETE,
+                message=f"Code verification passed. Checked {result.files_checked} files.",
+                data={"files_checked": result.files_checked, "duration_ms": result.duration_ms},
+            ))
+            return PipelineState.REVIEW
+
+        error_count = sum(1 for i in result.issues if i.severity == "error")
+        self.emit_event(PipelineEvent(
+            run_id=self.current_run.run_id,
+            agent=AgentName.SYSTEM,
+            event_type=EventType.BUILD_CHECK_FAILED,
+            message=f"Found {error_count} issue(s) in the generated code. Sending back for fixes.",
+            data={
+                "error_count": error_count,
+                "issues": [i.model_dump() for i in result.issues],
+                "duration_ms": result.duration_ms,
+            },
+        ))
+
+        if self.code_revision_count >= settings.max_code_revision_cycles:
+            logger.info(
+                "Build check failed but code revision cap reached (%d). Accepting partial output.",
+                settings.max_code_revision_cycles,
+            )
+            self.current_run.outcome = "partial"
+            return PipelineState.COMPLETE
+
+        return PipelineState.CODE_REVISION
 
     async def _run_review(self) -> PipelineState:
         """Run the QA Reviewer agent."""
@@ -353,15 +411,47 @@ class PipelineRunner:
             "finalized_config": self.context["finalized_config"],
             "technical_design": self.context["technical_design"],
             "previous_code": self.context["code_output"],
-            "qa_review": self.context["qa_review"],
+            "qa_review": self.context.get("qa_review"),
+            "build_check_result": self.context.get("build_check_result"),
         }
 
         result = await dev.execute(
             dev_context, self.current_run.run_id, self.emit_event
         )
 
+        # Developer returns CodePatch on revision cycles — merge with previous output
+        if isinstance(result, CodePatch):
+            previous = self.context["code_output"]
+            prev_paths = {f.path for f in previous.files}
+            replaced_paths = {f.path for f in result.files_to_replace}
+            deleted_paths = set(result.files_to_delete)
+
+            result = apply_patch(previous, result)
+
+            # Emit FILE_GENERATED events with action discriminator
+            for code_file in replaced_paths:
+                action = "updated" if code_file in prev_paths else "created"
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.DEVELOPER,
+                    event_type=EventType.FILE_GENERATED,
+                    message=f"{action.capitalize()}: {code_file}",
+                    data={"path": code_file, "action": action},
+                ))
+            for path in deleted_paths:
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.DEVELOPER,
+                    event_type=EventType.FILE_GENERATED,
+                    message=f"Removed: {path}",
+                    data={"path": path, "action": "removed"},
+                ))
+
         self.context["code_output"] = result
-        return PipelineState.REVIEW
+        # Clear stale build_check_result and qa_review so next cycle starts fresh
+        self.context.pop("build_check_result", None)
+        self.context.pop("qa_review", None)
+        return PipelineState.BUILD_CHECK
 
     async def _run_design_revision(self) -> PipelineState:
         """Re-run the Solution Architect with QA feedback."""

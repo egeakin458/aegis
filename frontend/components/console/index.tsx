@@ -8,6 +8,7 @@ import { FileGeneratedCard } from './entries/file-generated'
 import { ClarificationCard } from './entries/clarification'
 import { ConfigFinalizedCard } from './entries/config-finalized'
 import { RevisionRequestedCard } from './entries/revision-requested'
+import { BuildCheckCard } from './entries/build-check'
 import { ErrorCard } from './entries/error-entry'
 import { SummaryCard } from './entries/summary'
 import type { ConsoleEntry } from '@/lib/types/ui'
@@ -41,6 +42,7 @@ export function ConsolePane({ entries, onClarificationSubmit, onViewFiles }: Pro
       )
       case 'config-finalized': return <ConfigFinalizedCard key={entry.id} entry={entry} />
       case 'revision-requested': return <RevisionRequestedCard key={entry.id} entry={entry} />
+      case 'build-check': return <BuildCheckCard key={entry.id} entry={entry} />
       case 'error-entry': return <ErrorCard key={entry.id} entry={entry} />
       case 'summary': return <SummaryCard key={entry.id} entry={entry} onViewFiles={onViewFiles} />
     }

@@ -83,6 +83,7 @@ When producing clarification questions:
 
 When producing the finalized configuration:
 - The config field must be a complete, valid customer configuration. You may refine the customer's original input — fix typos, clarify vague descriptions, rewrite feature descriptions to be unambiguous — but you must NOT add features, remove features, or change the customer's intent.
+- Each feature in config.features.requested has a "feature_id" field. You MUST preserve every feature_id exactly as provided in the input. Never invent, modify, or omit feature_id values.
 - For any field where you made a judgment call or filled in missing information, add an entry to the assumptions list documenting: which field, what the customer originally provided (or null if they provided nothing), what you assumed, and why.
 - The project summary must be a 2-4 sentence plain-language brief that a non-technical person could read and say "yes, that is what I want." It should cover: what the application does, who uses it, and the key capabilities.
 - Set is_complete to true only if you are confident the configuration is sufficient for the Solution Architect to produce a complete technical design without guessing.
@@ -153,7 +154,9 @@ When your task says to finalize, produce the finalized configuration directly as
 
 "finalized_config" — object containing:
 
-  "config" — the complete, refined customer configuration with sections: business_context, problem_statement, features, data, design, technical, meta.
+  "config" — the complete, refined customer configuration with sections: business_context, problem_statement, features, data, design, technical, meta. Key structured fields:
+    - data.entities: list of objects, each with "name" (singular PascalCase), "description", and optional "estimated_volume". Must be a list, never a plain string.
+    - technical.user_roles: list of objects, each with "name" (snake_case) and "description". Use empty list when auth_required is false.
 
   "assumptions" — list of assumption objects (can be empty). Each has: field_path, original_value, assumed_value, reasoning.
 

@@ -24,6 +24,7 @@ from app.db import repositories as repo
 from app.pipeline.manager import runner_manager
 from app.schemas.customer_config import CustomerConfig
 from app.schemas.pipeline_events import EventType, PipelineState
+from app.utils.feature_id import slug_feature_id
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ router = APIRouter()
 # Terminal event types that signal the SSE stream should close
 _TERMINAL_EVENTS = {
     EventType.PIPELINE_COMPLETE.value,
+    EventType.PIPELINE_PARTIAL.value,
     EventType.PIPELINE_FAILED.value,
 }
 
@@ -41,6 +43,9 @@ _SSE_KEEPALIVE_TIMEOUT = 30.0  # seconds between keepalive pings
 @router.post("/start", status_code=201)
 async def start_pipeline(config: CustomerConfig):
     """Start a new pipeline run. Returns the run_id immediately."""
+    for feature in config.features.requested:
+        if not feature.feature_id:
+            feature.feature_id = slug_feature_id(feature.description)
     run_id = await runner_manager.start_run(config)
     return {"run_id": run_id, "status": "started"}
 

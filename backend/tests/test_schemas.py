@@ -85,7 +85,11 @@ def sample_customer_config() -> CustomerConfig:
                 FeatureRequest(description="Order status tracking", priority=3),
             ]
         ),
-        data=DataRequirements(entities="Menu items, orders, customers"),
+        data=DataRequirements(entities=[
+            {"name": "MenuItem", "description": "A menu item", "estimated_volume": None},
+            {"name": "Order", "description": "A customer order", "estimated_volume": None},
+            {"name": "Customer", "description": "A customer", "estimated_volume": None},
+        ]),
     )
 
 
@@ -122,7 +126,7 @@ def sample_technical_design() -> TechnicalDesign:
                     DataField(name="price", type="float", required=True),
                     DataField(name="category", type="string", required=True),
                 ],
-                relationships=["has_many:OrderItem"],
+                relationships=[{"kind": "has_many", "target_model": "OrderItem", "description": None}],
             ),
         ],
         api_endpoints=[
@@ -164,7 +168,10 @@ def sample_code_output() -> CodeOutput:
             ),
         ],
         setup_instructions="npm install && npm run dev",
-        features_implemented=["Menu display", "Shopping cart"],
+        features_implemented=[
+            {"feature_id": "feat_menu-display_a1b2c3", "description": "Menu display", "implementation_notes": None},
+            {"feature_id": "feat_shopping-cart_d4e5f6", "description": "Shopping cart", "implementation_notes": None},
+        ],
     )
 
 
@@ -183,7 +190,10 @@ def sample_qa_review() -> QAReview:
                 suggestion="Add try/catch around fetch calls.",
             ),
         ],
-        requirements_coverage={"Menu display": True, "Shopping cart": True},
+        requirements_coverage=[
+            {"feature_id": "feat_menu-display_a1b2c3", "implemented": True, "evidence": "Menu page implemented"},
+            {"feature_id": "feat_shopping-cart_d4e5f6", "implemented": True, "evidence": "Cart implemented"},
+        ],
         code_quality_score=4,
         summary="Application meets requirements. Minor code quality improvements suggested.",
     )
@@ -214,7 +224,7 @@ class TestCustomerConfig:
             features=Features(
                 requested=[FeatureRequest(description="Landing page", priority=1)]
             ),
-            data=DataRequirements(entities="None"),
+            data=DataRequirements(entities=[]),
         )
         assert config.design.style == DesignStyle.NO_PREFERENCE
         assert config.technical.mobile == MobileSupport.NICE_TO_HAVE
@@ -299,7 +309,7 @@ class TestCodeOutput:
                 project_name="test",
                 files=[],
                 setup_instructions="test",
-                features_implemented=["test"],
+                features_implemented=[{"feature_id": "feat_test_a1b2c3", "description": "test", "implementation_notes": None}],
             )
 
 
@@ -313,7 +323,7 @@ class TestQAReview:
             QAReview(
                 reasoning="test",
                 verdict=ReviewVerdict.APPROVE,
-                requirements_coverage={},
+                requirements_coverage=[],
                 code_quality_score=6,
                 summary="test",
             )

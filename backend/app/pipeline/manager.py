@@ -97,6 +97,7 @@ class RunnerManager:
         if (
             runner.current_run
             and runner.current_run.state == PipelineState.COMPLETE
+            and runner.current_run.outcome in ("success", "partial")
             and "code_output" in runner.context
         ):
             try:

@@ -70,10 +70,11 @@ export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig 
     priority: mustHave.length + i + 1,
   }))
 
-  const entityParts: string[] = []
-  if (form.dataTypes.length > 0) entityParts.push(form.dataTypes.join(', '))
-  if (form.externalIntegrations.length > 0) entityParts.push('integrations: ' + form.externalIntegrations.join(', '))
-  const entities = entityParts.length > 0 ? entityParts.join('; ') : 'Application data'
+  const entities = form.dataTypes.map(name => ({
+    name,
+    description: `Data entity: ${name}`,
+    estimated_volume: null,
+  }))
 
   const painPointsStr = form.painPoints.length > 0 ? form.painPoints.join('. ') : null
 
@@ -108,7 +109,7 @@ export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig 
     technical: {
       access_scope: (ACCESS_SCOPE_MAP[form.accessScope] ?? form.accessScope) as AccessScope,
       auth_required: true,
-      user_roles: null,
+      user_roles: [],
       mobile: (MOBILE_SUPPORT_MAP[form.mobileSupport] ?? form.mobileSupport) as MobileSupport,
     },
     meta: {

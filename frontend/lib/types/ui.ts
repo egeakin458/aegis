@@ -6,6 +6,8 @@ export type OrbitPhase =
   | 'ra-clarification'
   | 'sa-running'
   | 'dev-running'
+  | 'build-check-running'
+  | 'build-check-failed'
   | 'qa-running'
   | 'dev-revising'
   | 'sa-revising'
@@ -23,6 +25,7 @@ export type ConsoleEntryType =
   | 'clarification'
   | 'config-finalized'
   | 'revision-requested'
+  | 'build-check'
   | 'error-entry'
   | 'summary'
 
@@ -37,18 +40,21 @@ export interface AgentStartEntry extends BaseEntry { type: 'agent-start'; agentL
 export interface AgentCompleteEntry extends BaseEntry { type: 'agent-complete'; agentLabel: string; tokensUsed: number; durationMs: number }
 export interface MessageEntry extends BaseEntry { type: 'message'; text: string }
 export interface ProgressUpdateEntry extends BaseEntry { type: 'progress-update'; text: string }
-export interface FileGeneratedEntry extends BaseEntry { type: 'file-generated'; path: string; language: string }
+export interface FileGeneratedEntry extends BaseEntry { type: 'file-generated'; path: string; language: string; action?: 'created' | 'updated' | 'removed' }
 export interface ClarificationQuestion { id: string; question: string; answer?: string }
 export interface ClarificationEntry extends BaseEntry { type: 'clarification'; questions: ClarificationQuestion[]; submitted: boolean }
 export interface ConfigFinalizedEntry extends BaseEntry { type: 'config-finalized'; projectSummary: string; assumptions: string[] }
 export interface RevisionRequestedEntry extends BaseEntry { type: 'revision-requested'; verdict: string; issues: string[]; revisionNumber: number; expanded: boolean }
 export interface ErrorEntry extends BaseEntry { type: 'error-entry'; message: string; detail?: string; terminal: boolean }
-export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number }
+export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number; partial?: boolean }
+
+export interface BuildCheckIssue { file: string; line?: number | null; column?: number | null; severity: 'error' | 'warning'; message: string; check: string }
+export interface BuildCheckEntry extends BaseEntry { type: 'build-check'; passed: boolean; filesChecked: number; durationMs: number; issues: BuildCheckIssue[] }
 
 export type ConsoleEntry =
   | AgentStartEntry | AgentCompleteEntry | MessageEntry | ProgressUpdateEntry
   | FileGeneratedEntry | ClarificationEntry | ConfigFinalizedEntry
-  | RevisionRequestedEntry | ErrorEntry | SummaryEntry
+  | RevisionRequestedEntry | BuildCheckEntry | ErrorEntry | SummaryEntry
 
 export interface PipelineState {
   phase: OrbitPhase

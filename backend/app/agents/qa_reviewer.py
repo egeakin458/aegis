@@ -51,7 +51,7 @@ METHODOLOGY
 
 Follow this review process in order:
 
-Step 1 — Requirements coverage check. Go through every feature in the FinalizedConfig's features list. For each feature, determine whether the CodeOutput implements it. A feature is "implemented" if there is code that provides the described functionality — not just a file that mentions it. Record each feature as true (implemented) or false (missing) in the requirements_coverage map.
+Step 1 — Requirements coverage check. Go through every feature in the FinalizedConfig's features list. For each feature, determine whether the CodeOutput implements it. A feature is "implemented" if there is code that provides the described functionality — not just a file that mentions it. Record each feature as an object in requirements_coverage with its feature_id (copied verbatim), implemented (boolean), and evidence (brief reason).
 
 Step 2 — Design compliance check. Compare the CodeOutput against the TechnicalDesign:
 - Are all data models from the design present in the code with the correct fields?
@@ -59,6 +59,8 @@ Step 2 — Design compliance check. Compare the CodeOutput against the Technical
 - Are all UI components from the design present?
 - Are all files from the file_structure present in the code?
 - Does the project_name match?
+- Do all DataField.type values use only the allowed literals: string, integer, float, boolean, datetime, date, text, enum, json?
+- Do all DataModel.relationships use only the allowed kind values: belongs_to, has_many, has_one, many_to_many?
 
 Step 3 — Code quality review. For each code file, check:
 - Syntactic validity: does the code appear to be valid for its stated language?
@@ -125,7 +127,10 @@ The JSON must contain:
   "description" — string. Clear description of what is wrong.
   "suggestion" — string. Specific, actionable fix suggestion.
 
-"requirements_coverage" — object, required. Maps each customer feature description (string) to a boolean indicating whether it was implemented.
+"requirements_coverage" — list of objects, required. One entry per feature in FinalizedConfig.config.features.requested. Each object has:
+  "feature_id" — string. MUST match FeatureRequest.feature_id exactly. Do not invent IDs.
+  "implemented" — boolean. True if the feature was implemented, false if missing.
+  "evidence" — string or null. Brief evidence or reason for the coverage decision.
 
 "code_quality_score" — integer, required. Overall code quality rating from 1 to 5.
 

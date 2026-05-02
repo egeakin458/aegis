@@ -1,6 +1,6 @@
 import {
   Play, CheckCircle, MessageSquare, Zap, FileCode,
-  HelpCircle, ClipboardCheck, AlertTriangle, XCircle, Trophy,
+  HelpCircle, ClipboardCheck, AlertTriangle, XCircle, Trophy, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
 import type { ConsoleEntryType } from '@/lib/types/ui'
@@ -14,6 +14,7 @@ const ICONS: Record<ConsoleEntryType, LucideIcon> = {
   'clarification': HelpCircle,
   'config-finalized': ClipboardCheck,
   'revision-requested': AlertTriangle,
+  'build-check': ShieldCheck,
   'error-entry': XCircle,
   'summary': Trophy,
 }
@@ -27,6 +28,7 @@ const COLORS: Record<ConsoleEntryType, string> = {
   'clarification': 'text-amber-400',
   'config-finalized': 'text-emerald-400',
   'revision-requested': 'text-amber-400',
+  'build-check': 'text-cyan-400',
   'error-entry': 'text-red-400',
   'summary': 'text-emerald-400',
 }

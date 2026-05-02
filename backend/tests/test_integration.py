@@ -12,13 +12,22 @@ JSON matching the expected output schema.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.agents import Developer, QAReviewer, RequirementsAnalyst, SolutionArchitect
 from app.pipeline.runner import PipelineRunner
+from app.schemas.agent_outputs import BuildCheckResult
 from app.schemas.pipeline_events import EventType, PipelineState
+
+
+@pytest.fixture(autouse=True)
+def mock_build_check_pass():
+    """Patch run_build_check to return a passing result for integration tests."""
+    passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=4)
+    with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+        yield
 
 
 # ===========================================================================
@@ -43,11 +52,14 @@ RA_RESPONSE = {
             },
             "features": {
                 "requested": [
-                    {"description": "Menu display with categories", "priority": 1},
-                    {"description": "Shopping cart and checkout", "priority": 2},
+                    {"description": "Menu display with categories", "priority": 1, "feature_id": "feat_menu-display-with-categories_a1b2c3"},
+                    {"description": "Shopping cart and checkout", "priority": 2, "feature_id": "feat_shopping-cart-and-checkout_d4e5f6"},
                 ]
             },
-            "data": {"entities": "Menu items, orders, customers"},
+            "data": {"entities": [
+                {"name": "MenuItem", "description": "A menu item", "estimated_volume": None},
+                {"name": "Order", "description": "A customer order", "estimated_volume": None},
+            ]},
         },
         "assumptions": [
             {
@@ -77,7 +89,7 @@ SA_RESPONSE = {
                 {"name": "price", "type": "float", "required": True},
                 {"name": "category", "type": "string", "required": True},
             ],
-            "relationships": ["has_many:OrderItem"],
+            "relationships": [{"kind": "has_many", "target_model": "OrderItem", "description": None}],
         },
         {
             "name": "Order",
@@ -87,7 +99,7 @@ SA_RESPONSE = {
                 {"name": "status", "type": "enum", "required": True},
                 {"name": "created_at", "type": "datetime", "required": True},
             ],
-            "relationships": ["has_many:OrderItem"],
+            "relationships": [{"kind": "has_many", "target_model": "OrderItem", "description": None}],
         },
     ],
     "api_endpoints": [
@@ -161,8 +173,8 @@ DEV_RESPONSE = {
     ],
     "setup_instructions": "npm install && npm run dev",
     "features_implemented": [
-        "Menu display with categories",
-        "Shopping cart and checkout",
+        {"feature_id": "feat_menu-display-with-categories_a1b2c3", "description": "Menu display with categories", "implementation_notes": None},
+        {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "description": "Shopping cart and checkout", "implementation_notes": None},
     ],
     "known_limitations": [],
 }
@@ -171,10 +183,10 @@ QA_RESPONSE = {
     "reasoning": "All requirements are covered. Code is clean and consistent.",
     "verdict": "approve",
     "issues": [],
-    "requirements_coverage": {
-        "Menu display with categories": True,
-        "Shopping cart and checkout": True,
-    },
+    "requirements_coverage": [
+        {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "Menu page implemented"},
+        {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": True, "evidence": "Cart implemented"},
+    ],
     "code_quality_score": 4,
     "summary": "Your ordering application is ready. It includes a full menu display and checkout system.",
 }
@@ -494,10 +506,10 @@ class TestPipelineWithCodeRevision:
                     "suggestion": "Add try-catch and validate request body.",
                 }
             ],
-            "requirements_coverage": {
-                "Menu display with categories": True,
-                "Shopping cart and checkout": True,
-            },
+            "requirements_coverage": [
+                {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "Menu page present"},
+                {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": True, "evidence": "Cart present"},
+            ],
             "code_quality_score": 2,
             "summary": "The app works but needs better error handling.",
         }

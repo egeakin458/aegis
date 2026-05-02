@@ -54,7 +54,7 @@ def valid_config_payload():
         "features": {
             "requested": [{"description": "Landing page", "priority": 1}]
         },
-        "data": {"entities": "None"},
+        "data": {"entities": []},
     }
 
 

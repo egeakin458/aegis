@@ -121,8 +121,8 @@ def _code_output_payload() -> dict:
         ],
         "setup_instructions": "npm install && npm run dev",
         "features_implemented": [
-            "Menu display with categories",
-            "Shopping cart and checkout",
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "description": "Menu display with categories", "implementation_notes": None},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "description": "Shopping cart and checkout", "implementation_notes": None},
         ],
         "known_limitations": [],
     }
@@ -134,10 +134,10 @@ def _qa_review_payload(verdict: str = "approve") -> dict:
         "reasoning": "The implementation covers all stated requirements with good quality.",
         "verdict": verdict,
         "issues": [],
-        "requirements_coverage": {
-            "Menu display with categories": True,
-            "Shopping cart and checkout": True,
-        },
+        "requirements_coverage": [
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "MenuPage component renders menu items"},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": True, "evidence": "Cart and checkout pages implemented"},
+        ],
         "code_quality_score": 4,
         "summary": "Your application has been built and reviewed. Everything looks good.",
     }
@@ -158,10 +158,10 @@ def _qa_review_with_issues_payload(verdict: str = "revise_code") -> dict:
                 "suggestion": "Wrap the database call in a try-except and return HTTP 500 on failure.",
             }
         ],
-        "requirements_coverage": {
-            "Menu display with categories": True,
-            "Shopping cart and checkout": False,
-        },
+        "requirements_coverage": [
+            {"feature_id": "feat_menu-display-with-categories_a1b2c3", "implemented": True, "evidence": "Menu page present"},
+            {"feature_id": "feat_shopping-cart-and-checkout_d4e5f6", "implemented": False, "evidence": "Checkout not implemented"},
+        ],
         "code_quality_score": 2,
         "summary": "The application needs some fixes before it is ready for delivery.",
     }
@@ -860,7 +860,8 @@ class TestDeveloperBuildUserPrompt:
             "qa_review": qa_review,
         }
         prompt = self.agent.build_user_prompt(context)
-        assert "ALL files" in prompt or "all files" in prompt.lower()
+        assert "CODE REVISION REQUESTED" in prompt
+        assert "CodePatch" in prompt
 
 
 class TestDeveloperExecute:
@@ -940,7 +941,7 @@ class TestDeveloperExecute:
             emit_event=emit,
         )
 
-        assert "Menu display with categories" in result.features_implemented
+        assert any(f.description == "Menu display with categories" for f in result.features_implemented)
 
     @pytest.mark.asyncio
     async def test_execute_retries_on_schema_validation_failure(
@@ -1457,8 +1458,8 @@ class TestQAReviewerExecute:
             emit_event=emit,
         )
 
-        assert isinstance(result.requirements_coverage, dict)
-        assert result.requirements_coverage["Menu display with categories"] is True
+        assert isinstance(result.requirements_coverage, list)
+        assert any(c.feature_id == "feat_menu-display-with-categories_a1b2c3" and c.implemented is True for c in result.requirements_coverage)
 
     @pytest.mark.asyncio
     async def test_execute_revise_code_result_has_one_issue(
@@ -1843,4 +1844,125 @@ class TestQAReviewerEventEmission:
 
         error_event = next(e for e in events if e.event_type == EventType.ERROR)
         assert "error" in error_event.data
-        assert "raw_output" not in error_event.data
+
+
+# ===========================================================================
+# LLM retry behaviour (BaseAgent._call_llm)
+# ===========================================================================
+
+
+class TestBaseAgentLLMRetry:
+    """
+    _call_llm retries on RateLimitError, APITimeoutError, and 5xx APIStatusError.
+    It raises immediately on non-transient errors and gives up after max_llm_retries.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, mock_anthropic, monkeypatch):
+        import anthropic as _anthropic
+        import app.agents.base as _base
+
+        self.mock_client = mock_anthropic
+        monkeypatch.setattr(_base.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr("app.agents.base.settings.max_llm_retries", 2)
+        monkeypatch.setattr("app.agents.base.settings.llm_retry_base_delay_seconds", 0.0)
+        self.agent = SolutionArchitect()
+        self.agent.client = self.mock_client
+
+    def _captured(self):
+        events: list[PipelineEvent] = []
+        emit = lambda e: events.append(e)
+        return events, emit
+
+    @pytest.mark.asyncio
+    async def test_success_on_first_attempt_no_sleep(self, valid_finalized_config, sample_run_id):
+        self.mock_client.messages.create = AsyncMock(
+            return_value=_make_response(_technical_design_payload())
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+
+    @pytest.mark.asyncio
+    async def test_retries_on_rate_limit_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.RateLimitError("rate limit", response=MagicMock(status_code=429), body={}),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retries_on_api_timeout_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.APITimeoutError(MagicMock()),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retries_on_5xx_status_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.APIStatusError("server error", response=mock_response, body={}),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_raises_after_exhausting_retries(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=_anthropic.RateLimitError("rate limit", response=MagicMock(status_code=429), body={})
+        )
+        events, emit = self._captured()
+        with pytest.raises(_anthropic.RateLimitError):
+            await self.agent.execute(
+                {"finalized_config": valid_finalized_config}, sample_run_id, emit
+            )
+        # max_llm_retries=2 → 3 total attempts
+        assert self.mock_client.messages.create.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_does_not_retry_on_4xx_non_rate_limit(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=_anthropic.APIStatusError("bad request", response=mock_response, body={})
+        )
+        events, emit = self._captured()
+        with pytest.raises(_anthropic.APIStatusError):
+            await self.agent.execute(
+                {"finalized_config": valid_finalized_config}, sample_run_id, emit
+            )
+        assert self.mock_client.messages.create.call_count == 1

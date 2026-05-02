@@ -11,8 +11,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.schemas.agent_outputs import CodeOutput
+from app.schemas.agent_outputs import CodeOutput, CodePatch
 from app.schemas.pipeline_events import AgentName
+
+from typing import Type
+from pydantic import BaseModel
 
 from .base import BaseAgent
 
@@ -64,6 +67,7 @@ CONSTRAINTS
 
 You must NOT:
 - Deviate from the TechnicalDesign. If the design says to create a specific data model with specific fields, implement exactly that. Do not add, remove, or rename fields.
+- Use SQL column types other than what the field.type literal maps to: string→TEXT, integer→INTEGER, float→REAL, boolean→INTEGER (0/1), datetime→TEXT (ISO-8601), date→TEXT (YYYY-MM-DD), text→TEXT, enum→TEXT, json→TEXT.
 - Invent features, pages, or functionality not in the design or requirements.
 - Use placeholder or stub code. Every function must have a real implementation.
 - Skip files listed in the TechnicalDesign's file_structure.
@@ -77,7 +81,7 @@ You must ALWAYS:
 - Follow consistent naming conventions throughout the codebase.
 - Handle basic error cases (null checks, try-catch for API calls, form validation).
 - Include proper imports in every file.
-- List every implemented feature in features_implemented, using the customer's original feature descriptions.
+- List every implemented feature in features_implemented as a list of objects, each with "feature_id" (copied verbatim from the FinalizedConfig feature), "description", and optional "implementation_notes".
 - Document any known limitations honestly in known_limitations.
 
 OUTPUT FORMAT
@@ -98,7 +102,10 @@ The JSON must contain:
 
 "setup_instructions" — string, required. Step-by-step instructions to install dependencies and run the project.
 
-"features_implemented" — list of strings, required. Each string describes a feature from the customer's requirements that was implemented.
+"features_implemented" — list of objects, required. Each object has:
+  "feature_id" — string. MUST be copied verbatim from the corresponding FeatureRequest.feature_id in FinalizedConfig. Do not invent or modify IDs.
+  "description" — string. Human-readable description of the feature.
+  "implementation_notes" — string or null. Optional notes on how it was implemented.
 
 "known_limitations" — list of strings. Any features simplified or omitted, or known issues. Can be empty.
 
@@ -125,6 +132,12 @@ class Developer(BaseAgent):
             output_schema=CodeOutput,
         )
 
+    def _select_output_schema(self, context: dict[str, Any]) -> Type[BaseModel]:
+        """Return CodePatch on revision cycles; CodeOutput on the initial build."""
+        if "previous_code" in context:
+            return CodePatch
+        return CodeOutput
+
     def build_user_prompt(self, context: dict[str, Any]) -> str:
         """
         Build the user message from pipeline context.
@@ -145,21 +158,43 @@ class Developer(BaseAgent):
             technical_design.model_dump(mode="json"), indent=2
         )
 
-        # Code revision mode
-        if "previous_code" in context and "qa_review" in context:
-            qa_review_json = json.dumps(
-                context["qa_review"].model_dump(mode="json"), indent=2
-            )
+        # Code revision mode — triggered by QA review or build check failure
+        if "previous_code" in context:
+            qa_review = context.get("qa_review")
+            build_check_result = context.get("build_check_result")
+
+            feedback_sections = []
+            if qa_review is not None:
+                qa_review_json = json.dumps(qa_review.model_dump(mode="json"), indent=2)
+                feedback_sections.append(f"QA REVIEW FEEDBACK:\n{qa_review_json}")
+            if build_check_result is not None and not build_check_result.passed:
+                bc_json = json.dumps(build_check_result.model_dump(mode="json"), indent=2)
+                feedback_sections.append(
+                    f"REVISION FROM BUILD ERRORS\n\n"
+                    f"The build/syntax checker found errors that MUST be fixed. "
+                    f"Every error-severity issue below must be resolved in your revised output.\n\n"
+                    f"BUILD CHECK RESULT:\n{bc_json}"
+                )
+
+            feedback_block = "\n\n".join(feedback_sections) if feedback_sections else "(No specific feedback — address general quality.)"
             return (
                 f"CODE REVISION REQUESTED\n\n"
-                f"The QA Reviewer found issues with your previous implementation. "
-                f"Review the feedback and produce a revised CodeOutput that "
-                f"addresses the issues.\n\n"
+                f"OUTPUT SCHEMA: CodePatch\n\n"
+                f"Review the feedback below and produce a CodePatch — a partial update "
+                f"that contains ONLY the files that changed, plus any files to delete. "
+                f"Do NOT regenerate the entire codebase. Only include files where something "
+                f"actually changed.\n\n"
+                f"CodePatch schema:\n"
+                f'{{"reasoning": "why these changes fix the feedback",\n'
+                f' "files_to_replace": [<CodeFile objects for changed/new files only>],\n'
+                f' "files_to_delete": ["relative/path/to/remove.js"],\n'
+                f' "setup_instructions_changed": false,\n'
+                f' "new_setup_instructions": null,\n'
+                f' "features_implemented_delta": [<FeatureImplementation objects for newly completed features>]}}\n\n'
                 f"CUSTOMER REQUIREMENTS:\n{config_json}\n\n"
                 f"TECHNICAL DESIGN:\n{design_json}\n\n"
-                f"QA REVIEW FEEDBACK:\n{qa_review_json}\n\n"
-                f"Produce the complete revised CodeOutput as valid JSON. "
-                f"Include ALL files, not just the changed ones."
+                f"{feedback_block}\n\n"
+                f"Produce the CodePatch as valid JSON."
             )
 
         # Normal implementation mode

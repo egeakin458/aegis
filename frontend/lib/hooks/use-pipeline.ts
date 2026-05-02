@@ -135,10 +135,17 @@ export function usePipeline() {
       onEvent: (event) => {
         dispatch({ type: 'EVENT', event })
 
-        if (event.event_type === 'pipeline_complete' || event.event_type === 'pipeline_failed') {
+        if (
+          event.event_type === 'pipeline_complete' ||
+          event.event_type === 'pipeline_partial' ||
+          event.event_type === 'pipeline_failed'
+        ) {
           sseRef.current?.close()
         }
-        if (event.event_type === 'pipeline_complete') {
+        if (
+          event.event_type === 'pipeline_complete' ||
+          event.event_type === 'pipeline_partial'
+        ) {
           getOutput(runId)
             .then(manifest => dispatch({ type: 'OUTPUT_LOADED', manifest }))
             .catch(console.error)

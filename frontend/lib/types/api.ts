@@ -26,7 +26,12 @@ export type DataVolume = components['schemas']['DataVolume']
 // API response types (not in OpenAPI schema)
 export interface StartRunResponse { run_id: string; status: string }
 export interface OutputFile { path: string; language: string; description?: string; content?: string }
-export interface OutputManifest { run_id: string; files: OutputFile[] }
+export interface FeatureImplementation { feature_id: string; description: string; implementation_notes?: string | null }
+export interface OutputManifest { run_id: string; files: OutputFile[]; features_implemented?: FeatureImplementation[] }
+
+// Typed schema additions (new in Phase 3 — not yet in generated schema.d.ts)
+export interface Entity { name: string; description: string; estimated_volume?: string | null }
+export interface UserRole { name: string; description: string }
 
 // Pipeline event types (hand-written — SSE sends raw JSON not covered by OpenAPI)
 export type AgentName =
@@ -37,18 +42,19 @@ export type AgentName =
   | 'system'
 
 export type EventType =
-  | 'pipeline_started' | 'pipeline_complete' | 'pipeline_failed'
+  | 'pipeline_started' | 'pipeline_complete' | 'pipeline_partial' | 'pipeline_failed'
   | 'agent_start' | 'agent_complete'
   | 'llm_call_start' | 'llm_call_complete'
   | 'clarification_needed' | 'clarification_received' | 'config_finalized'
   | 'revision_requested' | 'revision_started'
   | 'validation_passed' | 'validation_failed'
   | 'file_generated' | 'progress_update'
+  | 'build_check_start' | 'build_check_complete' | 'build_check_failed'
   | 'error'
 
 export type PipelineStateValue =
   | 'intake' | 'requirements' | 'clarification' | 'design' | 'development'
-  | 'review' | 'code_revision' | 'design_revision' | 'complete' | 'failed'
+  | 'build_check' | 'review' | 'code_revision' | 'design_revision' | 'complete' | 'failed'
 
 export interface TokenUsage { input_tokens: number; output_tokens: number }
 
