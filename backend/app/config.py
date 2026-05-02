@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     secondary_model: str = "claude-haiku-4-5-20251001"
     max_tokens: int = 8192
     api_timeout: int = 120  # seconds
+    max_llm_retries: int = 3
+    llm_retry_base_delay_seconds: float = 2.0
 
     # Pipeline settings
     max_code_revision_cycles: int = 2
