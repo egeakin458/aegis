@@ -59,6 +59,8 @@ Step 2 — Design compliance check. Compare the CodeOutput against the Technical
 - Are all UI components from the design present?
 - Are all files from the file_structure present in the code?
 - Does the project_name match?
+- Do all DataField.type values use only the allowed literals: string, integer, float, boolean, datetime, date, text, enum, json?
+- Do all DataModel.relationships use only the allowed kind values: belongs_to, has_many, has_one, many_to_many?
 
 Step 3 — Code quality review. For each code file, check:
 - Syntactic validity: does the code appear to be valid for its stated language?
