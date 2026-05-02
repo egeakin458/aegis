@@ -8,6 +8,28 @@ Aegis is a multi-agent AI pipeline that operates as a virtual software company. 
 
 Senior thesis project — Izmir University of Economics, Computer Engineering.
 
+## Active Refactor — `feat/pipeline-refactor`
+
+The branch `feat/pipeline-refactor` (cut from `main` at `ec6e758`) is a major improvement to the development cycle. Full plan with rationale is in memory at:
+
+```
+~/.claude/projects/-home-ege-projects-aegis/memory/project_pipeline_refactor_plan.md
+```
+
+**7 Tier 1 items (priority order):**
+
+1. **Build/syntax verification** — `build_checker.py` + `BUILD_CHECK` state between Developer and QA
+2. **`feature_id` threading** — `FeatureRequest.feature_id` → `CodeOutput.features_implemented` → `QAReview.requirements_coverage` *(start here — schema foundation)*
+3. **Patch-based revisions** — `CodePatch` schema; Developer returns patches on revision instead of full regeneration
+4. **Typed structured schemas** — `DataRequirements.entities` and `TechnicalRequirements.user_roles` as typed lists
+5. **Enforce `DataField.type` as `Literal[...]`** — canonical type enum, structure `DataModel.relationships`
+6. **API timeout + retry** — `settings.api_timeout` in `BaseAgent._call_llm`, retry on `RateLimitError` / 5xx
+7. **`PIPELINE_PARTIAL` outcome** — distinct event + disk write when revision cap hit instead of `PIPELINE_FAILED`
+
+**Implementation order:** Start with #2 to stabilize schemas, then #1 (most invasive). Items #4 and #5 can be done in parallel with #2.
+
+---
+
 ## Development Commands
 
 ### Backend (run from `backend/` with virtualenv active)
@@ -134,7 +156,7 @@ The frontend (`frontend/`) is a Next.js 14 App Router app that consumes the back
 
 **Clarification pause/resume**: `CLARIFICATION_NEEDED` surfaces a `ClarificationCard` with a submittable form. Submit hits `POST /api/pipeline/{run_id}/clarification`. The SSE stream stays open throughout (backend pauses, does not close the stream).
 
-**Output**: On `PIPELINE_COMPLETE`, the hook fetches `GET /api/pipeline/{run_id}/output` and populates the `OutputViewer` drawer. The manifest includes inline file content (requires the backend modification in `output_storage.py` described below).
+**Output**: On `PIPELINE_COMPLETE`, the hook fetches `GET /api/pipeline/{run_id}/output` and populates the `OutputViewer` drawer. The manifest includes inline file content (written by `app/pipeline/output_storage.py`).
 
 ### Frontend Directory Map
 
@@ -196,7 +218,7 @@ All in `tailwind.config.ts` under `theme.extend.colors.aegis`:
 
 | Layer | Technology |
 |-------|-----------|
-| LLM | Anthropic Claude API (Sonnet 4.5 primary, Haiku 4.5 for validation) |
+| LLM | Anthropic Claude API (Sonnet 4.6 primary, Haiku 4.5 for validation) |
 | Backend | Python 3.12 + FastAPI |
 | Real-time | SSE via sse-starlette |
 | Frontend | Next.js 14 + Tailwind CSS + shadcn/ui |
