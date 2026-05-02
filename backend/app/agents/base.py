@@ -65,6 +65,14 @@ class BaseAgent:
         """
         raise NotImplementedError
 
+    def _select_output_schema(self, context: dict[str, Any]) -> Type[BaseModel]:
+        """Return the output schema to use for this call given the current context.
+
+        Subclasses can override this to switch schemas dynamically (e.g., Developer
+        emits CodePatch on revision instead of CodeOutput).
+        """
+        return self.output_schema
+
     async def execute(
         self,
         context: dict[str, Any],
@@ -86,6 +94,7 @@ class BaseAgent:
             ValueError: If output fails validation after retry
         """
         user_prompt = self.build_user_prompt(context)
+        active_schema = self._select_output_schema(context)
 
         # Emit start event
         emit_event(PipelineEvent(
@@ -111,7 +120,7 @@ class BaseAgent:
             result, tokens, duration = await self._call_llm(prompt, run_id, emit_event)
 
             try:
-                parsed = self._validate_output(result)
+                parsed = self._validate_output(result, active_schema)
                 emit_event(PipelineEvent(
                     run_id=run_id,
                     agent=self.name,
@@ -217,8 +226,9 @@ class BaseAgent:
 
         raise last_exc
 
-    def _validate_output(self, raw_text: str) -> BaseModel:
+    def _validate_output(self, raw_text: str, schema: Type[BaseModel] | None = None) -> BaseModel:
         """Parse and validate agent output against the schema."""
+        active = schema or self.output_schema
         # Strip markdown code fences if present
         text = raw_text.strip()
         if text.startswith("```json"):
@@ -230,7 +240,7 @@ class BaseAgent:
         text = text.strip()
 
         data = json.loads(text)
-        return self.output_schema.model_validate(data)
+        return active.model_validate(data)
 
     def _display_name(self) -> str:
         """Human-friendly agent name for UI messages."""
