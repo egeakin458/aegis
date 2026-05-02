@@ -422,7 +422,30 @@ class PipelineRunner:
         # Developer returns CodePatch on revision cycles — merge with previous output
         if isinstance(result, CodePatch):
             previous = self.context["code_output"]
+            prev_paths = {f.path for f in previous.files}
+            replaced_paths = {f.path for f in result.files_to_replace}
+            deleted_paths = set(result.files_to_delete)
+
             result = apply_patch(previous, result)
+
+            # Emit FILE_GENERATED events with action discriminator
+            for code_file in replaced_paths:
+                action = "updated" if code_file in prev_paths else "created"
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.DEVELOPER,
+                    event_type=EventType.FILE_GENERATED,
+                    message=f"{action.capitalize()}: {code_file}",
+                    data={"path": code_file, "action": action},
+                ))
+            for path in deleted_paths:
+                self.emit_event(PipelineEvent(
+                    run_id=self.current_run.run_id,
+                    agent=AgentName.DEVELOPER,
+                    event_type=EventType.FILE_GENERATED,
+                    message=f"Removed: {path}",
+                    data={"path": path, "action": "removed"},
+                ))
 
         self.context["code_output"] = result
         # Clear stale build_check_result and qa_review so next cycle starts fresh
