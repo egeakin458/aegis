@@ -8,25 +8,20 @@ Aegis is a multi-agent AI pipeline that operates as a virtual software company. 
 
 Senior thesis project — Izmir University of Economics, Computer Engineering.
 
-## Active Refactor — `feat/pipeline-refactor`
+## Pipeline Refactor v0.2.0 (merged 2026-05-03)
 
-The branch `feat/pipeline-refactor` (cut from `main` at `ec6e758`) is a major improvement to the development cycle. Full plan with rationale is in memory at:
+6-phase refactor merged from `feat/pipeline-refactor`. Full plan: `~/.claude/projects/-home-ege-projects-aegis/memory/project_pipeline_refactor_plan_updated.md`
 
-```
-~/.claude/projects/-home-ege-projects-aegis/memory/project_pipeline_refactor_plan.md
-```
+| Phase | What shipped |
+|-------|-------------|
+| 0 | State-machine handler registry (`runner.py` if/elif → dict dispatch) |
+| 1 | API timeout + exponential-backoff retry + `PIPELINE_PARTIAL` event |
+| 2 | `feature_id` threading (`FeatureRequest` → `CodeOutput` → `QAReview`) |
+| 3 | Typed schema batch (`entities`, `user_roles`, `DataField.type`, `DataRelationship`) |
+| 4 | `BUILD_CHECK` state with syntax/structural verification (full `next build` behind `enable_full_build_check` flag) |
+| 5 | `CodePatch` patch-based revisions (Developer returns diffs on revision cycles) |
 
-**7 Tier 1 items (priority order):**
-
-1. **Build/syntax verification** — `build_checker.py` + `BUILD_CHECK` state between Developer and QA
-2. **`feature_id` threading** — `FeatureRequest.feature_id` → `CodeOutput.features_implemented` → `QAReview.requirements_coverage` *(start here — schema foundation)*
-3. **Patch-based revisions** — `CodePatch` schema; Developer returns patches on revision instead of full regeneration
-4. **Typed structured schemas** — `DataRequirements.entities` and `TechnicalRequirements.user_roles` as typed lists
-5. **Enforce `DataField.type` as `Literal[...]`** — canonical type enum, structure `DataModel.relationships`
-6. **API timeout + retry** — `settings.api_timeout` in `BaseAgent._call_llm`, retry on `RateLimitError` / 5xx
-7. **`PIPELINE_PARTIAL` outcome** — distinct event + disk write when revision cap hit instead of `PIPELINE_FAILED`
-
-**Implementation order:** Start with #2 to stabilize schemas, then #1 (most invasive). Items #4 and #5 can be done in parallel with #2.
+Tagged: `v0.2.0-pipeline-refactor`
 
 ---
 
