@@ -77,7 +77,7 @@ You must ALWAYS:
 - Follow consistent naming conventions throughout the codebase.
 - Handle basic error cases (null checks, try-catch for API calls, form validation).
 - Include proper imports in every file.
-- List every implemented feature in features_implemented, using the customer's original feature descriptions.
+- List every implemented feature in features_implemented as a list of objects, each with "feature_id" (copied verbatim from the FinalizedConfig feature), "description", and optional "implementation_notes".
 - Document any known limitations honestly in known_limitations.
 
 OUTPUT FORMAT
@@ -98,7 +98,10 @@ The JSON must contain:
 
 "setup_instructions" — string, required. Step-by-step instructions to install dependencies and run the project.
 
-"features_implemented" — list of strings, required. Each string describes a feature from the customer's requirements that was implemented.
+"features_implemented" — list of objects, required. Each object has:
+  "feature_id" — string. MUST be copied verbatim from the corresponding FeatureRequest.feature_id in FinalizedConfig. Do not invent or modify IDs.
+  "description" — string. Human-readable description of the feature.
+  "implementation_notes" — string or null. Optional notes on how it was implemented.
 
 "known_limitations" — list of strings. Any features simplified or omitted, or known issues. Can be empty.
 
