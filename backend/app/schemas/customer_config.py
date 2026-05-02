@@ -103,9 +103,16 @@ class FileUpload(BaseModel):
     file_path: Optional[str] = Field(None, description="Server-side file path after upload")
 
 
+class Entity(BaseModel):
+    """A single data entity the application needs to store."""
+    name: str = Field(..., description="Entity name in singular PascalCase, e.g. 'Order', 'MenuItem'")
+    description: str = Field(..., description="What this entity represents and what attributes it has")
+    estimated_volume: Optional[str] = Field(None, description="Free-form estimate, e.g. 'a few hundred per month'")
+
+
 class DataRequirements(BaseModel):
     """Section 4: Data and content requirements."""
-    entities: str = Field(..., description="What information needs to be stored")
+    entities: list[Entity] = Field(default_factory=list, description="Data entities the application needs to store")
     has_existing_data: bool = Field(False, description="Whether existing data needs importing")
     uploads: list[FileUpload] = Field(default_factory=list, description="Uploaded files")
     volume: DataVolume = Field(DataVolume.UNDER_100, description="Estimated data volume")
@@ -119,11 +126,17 @@ class DesignPreferences(BaseModel):
     style: DesignStyle = Field(DesignStyle.NO_PREFERENCE, description="Preferred visual style")
 
 
+class UserRole(BaseModel):
+    """A user role in the application."""
+    name: str = Field(..., description="Role name in snake_case, e.g. 'admin', 'staff', 'customer'")
+    description: str = Field(..., description="What this role can do")
+
+
 class TechnicalRequirements(BaseModel):
     """Section 6: Technical requirements (constrained choices)."""
     access_scope: AccessScope = Field(AccessScope.PUBLIC, description="Who needs access")
     auth_required: bool = Field(True, description="Whether user login is needed")
-    user_roles: Optional[str] = Field(None, description="User roles if auth is required")
+    user_roles: list[UserRole] = Field(default_factory=list, description="User roles when auth_required is true; empty list otherwise")
     mobile: MobileSupport = Field(MobileSupport.NICE_TO_HAVE, description="Mobile support level")
 
 
