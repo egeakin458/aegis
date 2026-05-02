@@ -11,8 +11,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.schemas.agent_outputs import CodeOutput
+from app.schemas.agent_outputs import CodeOutput, CodePatch
 from app.schemas.pipeline_events import AgentName
+
+from typing import Type
+from pydantic import BaseModel
 
 from .base import BaseAgent
 
@@ -129,6 +132,12 @@ class Developer(BaseAgent):
             output_schema=CodeOutput,
         )
 
+    def _select_output_schema(self, context: dict[str, Any]) -> Type[BaseModel]:
+        """Return CodePatch on revision cycles; CodeOutput on the initial build."""
+        if "previous_code" in context:
+            return CodePatch
+        return CodeOutput
+
     def build_user_prompt(self, context: dict[str, Any]) -> str:
         """
         Build the user message from pipeline context.
@@ -170,13 +179,22 @@ class Developer(BaseAgent):
             feedback_block = "\n\n".join(feedback_sections) if feedback_sections else "(No specific feedback — address general quality.)"
             return (
                 f"CODE REVISION REQUESTED\n\n"
-                f"Review the feedback below and produce a revised CodeOutput that "
-                f"addresses all issues.\n\n"
+                f"OUTPUT SCHEMA: CodePatch\n\n"
+                f"Review the feedback below and produce a CodePatch — a partial update "
+                f"that contains ONLY the files that changed, plus any files to delete. "
+                f"Do NOT regenerate the entire codebase. Only include files where something "
+                f"actually changed.\n\n"
+                f"CodePatch schema:\n"
+                f'{{"reasoning": "why these changes fix the feedback",\n'
+                f' "files_to_replace": [<CodeFile objects for changed/new files only>],\n'
+                f' "files_to_delete": ["relative/path/to/remove.js"],\n'
+                f' "setup_instructions_changed": false,\n'
+                f' "new_setup_instructions": null,\n'
+                f' "features_implemented_delta": [<FeatureImplementation objects for newly completed features>]}}\n\n'
                 f"CUSTOMER REQUIREMENTS:\n{config_json}\n\n"
                 f"TECHNICAL DESIGN:\n{design_json}\n\n"
                 f"{feedback_block}\n\n"
-                f"Produce the complete revised CodeOutput as valid JSON. "
-                f"Include ALL files, not just the changed ones."
+                f"Produce the CodePatch as valid JSON."
             )
 
         # Normal implementation mode
