@@ -25,6 +25,7 @@ export function derivePhase(
     case 'clarification_received': return 'ra-running'
 
     case 'pipeline_complete': return 'complete'
+    case 'pipeline_partial': return 'complete'
     case 'pipeline_failed': return 'error'
 
     default: return current

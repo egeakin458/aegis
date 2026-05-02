@@ -37,7 +37,7 @@ export type AgentName =
   | 'system'
 
 export type EventType =
-  | 'pipeline_started' | 'pipeline_complete' | 'pipeline_failed'
+  | 'pipeline_started' | 'pipeline_complete' | 'pipeline_partial' | 'pipeline_failed'
   | 'agent_start' | 'agent_complete'
   | 'llm_call_start' | 'llm_call_complete'
   | 'clarification_needed' | 'clarification_received' | 'config_finalized'

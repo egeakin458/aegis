@@ -43,7 +43,7 @@ export interface ClarificationEntry extends BaseEntry { type: 'clarification'; q
 export interface ConfigFinalizedEntry extends BaseEntry { type: 'config-finalized'; projectSummary: string; assumptions: string[] }
 export interface RevisionRequestedEntry extends BaseEntry { type: 'revision-requested'; verdict: string; issues: string[]; revisionNumber: number; expanded: boolean }
 export interface ErrorEntry extends BaseEntry { type: 'error-entry'; message: string; detail?: string; terminal: boolean }
-export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number }
+export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number; partial?: boolean }
 
 export type ConsoleEntry =
   | AgentStartEntry | AgentCompleteEntry | MessageEntry | ProgressUpdateEntry

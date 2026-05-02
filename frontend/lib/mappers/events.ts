@@ -121,6 +121,16 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         fileCount: 0,
       }
 
+    case 'pipeline_partial':
+      return {
+        id, type: 'summary', agent, timestamp,
+        projectName: 'Your Application',
+        totalTokens: stateTotalTokens,
+        durationMs: 0,
+        fileCount: 0,
+        partial: true,
+      }
+
     // Intentionally ignored event types
     case 'pipeline_started':
     case 'llm_call_start':
