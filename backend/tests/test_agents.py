@@ -860,7 +860,8 @@ class TestDeveloperBuildUserPrompt:
             "qa_review": qa_review,
         }
         prompt = self.agent.build_user_prompt(context)
-        assert "ALL files" in prompt or "all files" in prompt.lower()
+        assert "CODE REVISION REQUESTED" in prompt
+        assert "CodePatch" in prompt
 
 
 class TestDeveloperExecute:

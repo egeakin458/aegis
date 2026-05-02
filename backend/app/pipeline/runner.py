@@ -28,6 +28,8 @@ from uuid import uuid4
 from app.agents.base import BaseAgent
 from app.config import settings
 from app.pipeline.build_checker import run_build_check
+from app.pipeline.patch import apply_patch
+from app.schemas.agent_outputs import CodeOutput, CodePatch
 from app.schemas.customer_config import (
     ClarificationRound,
     CustomerConfig,
@@ -417,7 +419,15 @@ class PipelineRunner:
             dev_context, self.current_run.run_id, self.emit_event
         )
 
+        # Developer returns CodePatch on revision cycles — merge with previous output
+        if isinstance(result, CodePatch):
+            previous = self.context["code_output"]
+            result = apply_patch(previous, result)
+
         self.context["code_output"] = result
+        # Clear stale build_check_result and qa_review so next cycle starts fresh
+        self.context.pop("build_check_result", None)
+        self.context.pop("qa_review", None)
         return PipelineState.BUILD_CHECK
 
     async def _run_design_revision(self) -> PipelineState:
