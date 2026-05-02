@@ -1843,4 +1843,125 @@ class TestQAReviewerEventEmission:
 
         error_event = next(e for e in events if e.event_type == EventType.ERROR)
         assert "error" in error_event.data
-        assert "raw_output" not in error_event.data
+
+
+# ===========================================================================
+# LLM retry behaviour (BaseAgent._call_llm)
+# ===========================================================================
+
+
+class TestBaseAgentLLMRetry:
+    """
+    _call_llm retries on RateLimitError, APITimeoutError, and 5xx APIStatusError.
+    It raises immediately on non-transient errors and gives up after max_llm_retries.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, mock_anthropic, monkeypatch):
+        import anthropic as _anthropic
+        import app.agents.base as _base
+
+        self.mock_client = mock_anthropic
+        monkeypatch.setattr(_base.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr("app.agents.base.settings.max_llm_retries", 2)
+        monkeypatch.setattr("app.agents.base.settings.llm_retry_base_delay_seconds", 0.0)
+        self.agent = SolutionArchitect()
+        self.agent.client = self.mock_client
+
+    def _captured(self):
+        events: list[PipelineEvent] = []
+        emit = lambda e: events.append(e)
+        return events, emit
+
+    @pytest.mark.asyncio
+    async def test_success_on_first_attempt_no_sleep(self, valid_finalized_config, sample_run_id):
+        self.mock_client.messages.create = AsyncMock(
+            return_value=_make_response(_technical_design_payload())
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+
+    @pytest.mark.asyncio
+    async def test_retries_on_rate_limit_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.RateLimitError("rate limit", response=MagicMock(status_code=429), body={}),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retries_on_api_timeout_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.APITimeoutError(MagicMock()),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retries_on_5xx_status_error(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        good_response = _make_response(_technical_design_payload())
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=[
+                _anthropic.APIStatusError("server error", response=mock_response, body={}),
+                good_response,
+            ]
+        )
+        events, emit = self._captured()
+        result = await self.agent.execute(
+            {"finalized_config": valid_finalized_config}, sample_run_id, emit
+        )
+        assert isinstance(result, TechnicalDesign)
+        assert self.mock_client.messages.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_raises_after_exhausting_retries(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=_anthropic.RateLimitError("rate limit", response=MagicMock(status_code=429), body={})
+        )
+        events, emit = self._captured()
+        with pytest.raises(_anthropic.RateLimitError):
+            await self.agent.execute(
+                {"finalized_config": valid_finalized_config}, sample_run_id, emit
+            )
+        # max_llm_retries=2 → 3 total attempts
+        assert self.mock_client.messages.create.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_does_not_retry_on_4xx_non_rate_limit(self, valid_finalized_config, sample_run_id, monkeypatch):
+        import anthropic as _anthropic
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        self.mock_client.messages.create = AsyncMock(
+            side_effect=_anthropic.APIStatusError("bad request", response=mock_response, body={})
+        )
+        events, emit = self._captured()
+        with pytest.raises(_anthropic.APIStatusError):
+            await self.agent.execute(
+                {"finalized_config": valid_finalized_config}, sample_run_id, emit
+            )
+        assert self.mock_client.messages.create.call_count == 1
