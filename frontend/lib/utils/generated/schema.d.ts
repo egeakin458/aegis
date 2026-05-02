@@ -209,9 +209,9 @@ export interface components {
         DataRequirements: {
             /**
              * Entities
-             * @description What information needs to be stored
+             * @description Data entities the application needs to store
              */
-            entities: string;
+            entities: { name: string; description: string; estimated_volume?: string | null }[];
             /**
              * Has Existing Data
              * @description Whether existing data needs importing
@@ -382,9 +382,9 @@ export interface components {
             auth_required: boolean;
             /**
              * User Roles
-             * @description User roles if auth is required
+             * @description User roles when auth_required is true; empty list otherwise
              */
-            user_roles?: string | null;
+            user_roles: { name: string; description: string }[];
             /**
              * @description Mobile support level
              * @default nice_to_have

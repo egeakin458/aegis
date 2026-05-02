@@ -29,6 +29,10 @@ export interface OutputFile { path: string; language: string; description?: stri
 export interface FeatureImplementation { feature_id: string; description: string; implementation_notes?: string | null }
 export interface OutputManifest { run_id: string; files: OutputFile[]; features_implemented?: FeatureImplementation[] }
 
+// Typed schema additions (new in Phase 3 — not yet in generated schema.d.ts)
+export interface Entity { name: string; description: string; estimated_volume?: string | null }
+export interface UserRole { name: string; description: string }
+
 // Pipeline event types (hand-written — SSE sends raw JSON not covered by OpenAPI)
 export type AgentName =
   | 'requirements_analyst'
