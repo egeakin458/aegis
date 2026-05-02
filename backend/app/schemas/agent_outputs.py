@@ -129,6 +129,34 @@ class CodeOutput(BaseModel):
     known_limitations: list[str] = Field(default_factory=list, description="Any features that were simplified or omitted")
 
 
+class CodePatch(BaseModel):
+    """
+    Revision output of the Developer agent (used on code revision cycles).
+    Replaces only the files that need to change instead of regenerating the entire codebase.
+    """
+    reasoning: str = Field(..., description="Why these specific changes address the feedback")
+    files_to_replace: list[CodeFile] = Field(
+        default_factory=list,
+        description="Files to overwrite in full (insert if path is new)",
+    )
+    files_to_delete: list[str] = Field(
+        default_factory=list,
+        description="Relative paths of files to remove from the project",
+    )
+    setup_instructions_changed: bool = Field(
+        False,
+        description="True if setup_instructions have changed from the previous CodeOutput",
+    )
+    new_setup_instructions: Optional[str] = Field(
+        None,
+        description="Updated setup instructions (only when setup_instructions_changed=True)",
+    )
+    features_implemented_delta: list[FeatureImplementation] = Field(
+        default_factory=list,
+        description="Newly implemented features added since the previous CodeOutput (merged by feature_id)",
+    )
+
+
 # ============================================================
 # QA Reviewer Output
 # ============================================================
