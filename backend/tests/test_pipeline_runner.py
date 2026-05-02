@@ -1513,3 +1513,65 @@ class TestPipelineRunnerInit:
         # run is now COMPLETE, not CLARIFICATION
         with pytest.raises(ValueError, match="CLARIFICATION"):
             await runner.resume(answers={})
+
+
+# ===========================================================================
+# PIPELINE_PARTIAL — revision cap emits partial event instead of complete
+# ===========================================================================
+
+
+class TestPipelinePartialEvent:
+    """When a revision cap is hit, PIPELINE_PARTIAL is emitted (not PIPELINE_COMPLETE)."""
+
+    def _agents_with_always_revise_code(self, valid_finalized_config: FinalizedConfig) -> dict:
+        qa = MagicMock(
+            spec=BaseAgent,
+            execute=AsyncMock(return_value=_make_qa_review(ReviewVerdict.REVISE_CODE)),
+        )
+        return {
+            "requirements_analyst": _make_mock_agent(
+                AgentName.REQUIREMENTS_ANALYST,
+                _make_finalized_ra_output(valid_finalized_config),
+            ),
+            "solution_architect": _make_mock_agent(
+                AgentName.SOLUTION_ARCHITECT, _make_technical_design()
+            ),
+            "developer": _make_mock_agent(AgentName.DEVELOPER, _make_code_output()),
+            "qa_reviewer": qa,
+        }
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_emits_pipeline_partial_not_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        event_types = _event_types(result.events)
+        assert EventType.PIPELINE_PARTIAL in event_types
+        assert EventType.PIPELINE_COMPLETE not in event_types
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_outcome_is_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        assert result.outcome == "partial"
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_state_is_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=self._agents_with_always_revise_code(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_happy_path_emits_pipeline_complete_not_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        runner = PipelineRunner(agents=_agents_for_happy_path(valid_finalized_config))
+        result = await runner.run(valid_customer_config)
+        event_types = _event_types(result.events)
+        assert EventType.PIPELINE_COMPLETE in event_types
+        assert EventType.PIPELINE_PARTIAL not in event_types
