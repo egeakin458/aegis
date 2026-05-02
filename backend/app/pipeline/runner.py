@@ -27,6 +27,7 @@ from uuid import uuid4
 
 from app.agents.base import BaseAgent
 from app.config import settings
+from app.pipeline.build_checker import run_build_check
 from app.schemas.customer_config import (
     ClarificationRound,
     CustomerConfig,
@@ -82,6 +83,7 @@ class PipelineRunner:
             PipelineState.REQUIREMENTS: self._run_requirements,
             PipelineState.DESIGN: self._run_design,
             PipelineState.DEVELOPMENT: self._run_development,
+            PipelineState.BUILD_CHECK: self._run_build_check,
             PipelineState.REVIEW: self._run_review,
             PipelineState.CODE_REVISION: self._run_code_revision,
             PipelineState.DESIGN_REVISION: self._run_design_revision,
@@ -289,7 +291,54 @@ class PipelineRunner:
         )
 
         self.context["code_output"] = result
-        return PipelineState.REVIEW
+        return PipelineState.BUILD_CHECK
+
+    async def _run_build_check(self) -> PipelineState:
+        """Run syntax + structural verification on generated code."""
+        code_output = self.context["code_output"]
+
+        self.emit_event(PipelineEvent(
+            run_id=self.current_run.run_id,
+            agent=AgentName.SYSTEM,
+            event_type=EventType.BUILD_CHECK_START,
+            message="Verifying the generated code structure and syntax.",
+        ))
+
+        result = await run_build_check(code_output)
+        self.context["build_check_result"] = result
+
+        if result.passed:
+            self.emit_event(PipelineEvent(
+                run_id=self.current_run.run_id,
+                agent=AgentName.SYSTEM,
+                event_type=EventType.BUILD_CHECK_COMPLETE,
+                message=f"Code verification passed. Checked {result.files_checked} files.",
+                data={"files_checked": result.files_checked, "duration_ms": result.duration_ms},
+            ))
+            return PipelineState.REVIEW
+
+        error_count = sum(1 for i in result.issues if i.severity == "error")
+        self.emit_event(PipelineEvent(
+            run_id=self.current_run.run_id,
+            agent=AgentName.SYSTEM,
+            event_type=EventType.BUILD_CHECK_FAILED,
+            message=f"Found {error_count} issue(s) in the generated code. Sending back for fixes.",
+            data={
+                "error_count": error_count,
+                "issues": [i.model_dump() for i in result.issues],
+                "duration_ms": result.duration_ms,
+            },
+        ))
+
+        if self.code_revision_count >= settings.max_code_revision_cycles:
+            logger.info(
+                "Build check failed but code revision cap reached (%d). Accepting partial output.",
+                settings.max_code_revision_cycles,
+            )
+            self.current_run.outcome = "partial"
+            return PipelineState.COMPLETE
+
+        return PipelineState.CODE_REVISION
 
     async def _run_review(self) -> PipelineState:
         """Run the QA Reviewer agent."""
@@ -360,7 +409,8 @@ class PipelineRunner:
             "finalized_config": self.context["finalized_config"],
             "technical_design": self.context["technical_design"],
             "previous_code": self.context["code_output"],
-            "qa_review": self.context["qa_review"],
+            "qa_review": self.context.get("qa_review"),
+            "build_check_result": self.context.get("build_check_result"),
         }
 
         result = await dev.execute(

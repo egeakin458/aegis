@@ -17,13 +17,15 @@ Coverage:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.agents.base import BaseAgent
 from app.pipeline.runner import PipelineRunner
 from app.schemas.agent_outputs import (
+    BuildCheckResult,
+    BuildCheckIssue,
     APIEndpoint,
     CodeFile,
     CodeOutput,
@@ -47,6 +49,22 @@ from app.schemas.pipeline_events import (
     TokenUsage,
 )
 from app.schemas.ra_output import RAOutput
+
+
+# ===========================================================================
+# Module-level autouse fixture — mock build checker to pass by default
+# ===========================================================================
+
+
+@pytest.fixture(autouse=True)
+def mock_build_check_pass():
+    """Patch run_build_check to return a passing result for all runner tests.
+
+    Build-checker-specific tests override this with their own patch.
+    """
+    passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+    with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+        yield
 
 
 # ===========================================================================

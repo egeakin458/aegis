@@ -12,13 +12,22 @@ JSON matching the expected output schema.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.agents import Developer, QAReviewer, RequirementsAnalyst, SolutionArchitect
 from app.pipeline.runner import PipelineRunner
+from app.schemas.agent_outputs import BuildCheckResult
 from app.schemas.pipeline_events import EventType, PipelineState
+
+
+@pytest.fixture(autouse=True)
+def mock_build_check_pass():
+    """Patch run_build_check to return a passing result for integration tests."""
+    passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=4)
+    with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+        yield
 
 
 # ===========================================================================

@@ -149,19 +149,32 @@ class Developer(BaseAgent):
             technical_design.model_dump(mode="json"), indent=2
         )
 
-        # Code revision mode
-        if "previous_code" in context and "qa_review" in context:
-            qa_review_json = json.dumps(
-                context["qa_review"].model_dump(mode="json"), indent=2
-            )
+        # Code revision mode — triggered by QA review or build check failure
+        if "previous_code" in context:
+            qa_review = context.get("qa_review")
+            build_check_result = context.get("build_check_result")
+
+            feedback_sections = []
+            if qa_review is not None:
+                qa_review_json = json.dumps(qa_review.model_dump(mode="json"), indent=2)
+                feedback_sections.append(f"QA REVIEW FEEDBACK:\n{qa_review_json}")
+            if build_check_result is not None and not build_check_result.passed:
+                bc_json = json.dumps(build_check_result.model_dump(mode="json"), indent=2)
+                feedback_sections.append(
+                    f"REVISION FROM BUILD ERRORS\n\n"
+                    f"The build/syntax checker found errors that MUST be fixed. "
+                    f"Every error-severity issue below must be resolved in your revised output.\n\n"
+                    f"BUILD CHECK RESULT:\n{bc_json}"
+                )
+
+            feedback_block = "\n\n".join(feedback_sections) if feedback_sections else "(No specific feedback — address general quality.)"
             return (
                 f"CODE REVISION REQUESTED\n\n"
-                f"The QA Reviewer found issues with your previous implementation. "
-                f"Review the feedback and produce a revised CodeOutput that "
-                f"addresses the issues.\n\n"
+                f"Review the feedback below and produce a revised CodeOutput that "
+                f"addresses all issues.\n\n"
                 f"CUSTOMER REQUIREMENTS:\n{config_json}\n\n"
                 f"TECHNICAL DESIGN:\n{design_json}\n\n"
-                f"QA REVIEW FEEDBACK:\n{qa_review_json}\n\n"
+                f"{feedback_block}\n\n"
                 f"Produce the complete revised CodeOutput as valid JSON. "
                 f"Include ALL files, not just the changed ones."
             )
