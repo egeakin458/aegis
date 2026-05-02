@@ -177,3 +177,29 @@ class QAReview(BaseModel):
     )
     code_quality_score: int = Field(..., ge=1, le=5, description="Overall code quality rating 1-5")
     summary: str = Field(..., description="Human-readable review summary for the UI")
+
+
+# ============================================================
+# Build Checker Output
+# ============================================================
+
+class BuildCheckIssue(BaseModel):
+    """A single issue found by the build checker."""
+    file: str = Field(..., description="Relative file path where the issue was found")
+    line: Optional[int] = Field(None, description="Line number of the issue, if applicable")
+    column: Optional[int] = Field(None, description="Column number of the issue, if applicable")
+    severity: Literal["error", "warning"] = Field(..., description="error | warning")
+    message: str = Field(..., description="Human-readable issue description")
+    check: Literal["syntax_js", "json_parse", "missing_required_file", "next_build"] = Field(
+        ..., description="Which check detected this issue"
+    )
+
+
+class BuildCheckResult(BaseModel):
+    """Result of the build/syntax verification step."""
+    passed: bool = Field(..., description="True if no errors were found")
+    duration_ms: int = Field(..., description="How long the check took in milliseconds")
+    files_checked: int = Field(..., description="Number of files that were checked")
+    issues: list[BuildCheckIssue] = Field(default_factory=list)
+    full_build_attempted: bool = Field(False, description="True if next build was attempted")
+    full_build_log: Optional[str] = Field(None, description="Captured next build output if attempted")
