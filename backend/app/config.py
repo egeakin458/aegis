@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # Output
     output_dir: str = "outputs"  # Where generated code projects are saved
 
+    # Build checker
+    enable_full_build_check: bool = False
+    full_build_timeout_seconds: int = 180
+    build_check_node_path: str = "node"
+
     def validate_required(self) -> None:
         """Validate that required settings are configured. Call at startup."""
         if not self.anthropic_api_key:
