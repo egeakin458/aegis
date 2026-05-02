@@ -5,6 +5,8 @@ Covers: happy path, referential integrity errors, uniqueness checks,
 default value generation, and schema_version literal.
 """
 
+import json
+import pathlib
 import pytest
 from pydantic import ValidationError
 
@@ -18,6 +20,35 @@ from app.schemas.customer_config_v2 import (
     Relationship,
     UseCase,
 )
+
+
+_FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
+
+
+# --- Golden fixture test ---
+
+def test_golden_fixture_validates():
+    """The e-commerce golden fixture must validate cleanly against CustomerConfigV2."""
+    raw = json.loads((_FIXTURES_DIR / "ddc_ecommerce.json").read_text())
+    cfg = CustomerConfigV2.model_validate(raw)
+    assert cfg.schema_version == "ddc-v1"
+    assert len(cfg.actors) == 2
+    assert len(cfg.entities) == 3
+    assert len(cfg.relationships) == 2
+    assert len(cfg.business_rules) == 3
+    assert len(cfg.use_cases) == 5
+    # Verify actor role names
+    role_names = {a.role_name for a in cfg.actors}
+    assert role_names == {"Customer", "Admin"}
+    # Verify entity names
+    entity_names = {e.name for e in cfg.entities}
+    assert entity_names == {"Product", "Order", "OrderItem"}
+    # Verify all use_case actor/entity refs are valid
+    actor_ids = {a.id for a in cfg.actors}
+    entity_ids = {e.id for e in cfg.entities}
+    for uc in cfg.use_cases:
+        assert uc.actor_id in actor_ids
+        assert uc.primary_entity_id in entity_ids
 
 
 # --- Helpers ---

@@ -26,6 +26,11 @@ from app.schemas.customer_config import (
     ClarificationRound,
 )
 from app.schemas.pipeline_events import PipelineEvent, TokenUsage
+from app.schemas.customer_config_v2 import CustomerConfigV2
+
+import pathlib
+
+_FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +108,17 @@ def sample_clarification_round(
         questions=[sample_clarification_question],
         answers={"q1": "Yes, always"},
     )
+
+
+# ---------------------------------------------------------------------------
+# DDC v1 fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def ddc_ecommerce() -> CustomerConfigV2:
+    """Complete valid DDC for a small e-commerce store. Canonical test fixture."""
+    raw = json.loads((_FIXTURES_DIR / "ddc_ecommerce.json").read_text())
+    return CustomerConfigV2.model_validate(raw)
 
 
 # ---------------------------------------------------------------------------
