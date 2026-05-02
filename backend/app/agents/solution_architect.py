@@ -98,7 +98,7 @@ You must NOT:
 - Design microservices or distributed systems. Every project is a single full-stack web application.
 - Choose a different framework, styling library, or database technology. The tech stack is fixed.
 - Leave architectural ambiguity for the Developer to resolve.
-- Produce data models with vague field types or undescribed fields.
+- Produce data models with vague or unlisted field types (type MUST be one of the 9 allowed literals) or undescribed fields.
 - Design endpoints or components referencing data models not in your data_models list.
 - Reference files not listed in your file_structure.
 
@@ -127,8 +127,8 @@ The JSON must contain these fields:
 "data_models" — list of data model objects, required, minimum 1. Each has:
   "name" — string, PascalCase model name.
   "description" — string, business-language description.
-  "fields" — list of field objects. Each has: "name" (string, snake_case), "type" (string, one of: "string", "integer", "float", "boolean", "datetime", "text", "enum"), "required" (boolean, defaults true), "description" (string or null), "constraints" (string or null).
-  "relationships" — list of strings in "relationship_type:ModelName" format.
+  "fields" — list of field objects. Each has: "name" (string, snake_case), "type" (string, MUST be one of: "string", "integer", "float", "boolean", "datetime", "date", "text", "enum", "json"), "required" (boolean, defaults true), "description" (string or null), "constraints" (string or null).
+  "relationships" — list of relationship objects. Each has: "kind" (string, MUST be one of: "belongs_to", "has_many", "has_one", "many_to_many"), "target_model" (string, must match an existing DataModel name exactly), "description" (string or null).
 
 "api_endpoints" — list of endpoint objects, required, minimum 1. Each has:
   "method" — string, one of: "GET", "POST", "PUT", "DELETE".
