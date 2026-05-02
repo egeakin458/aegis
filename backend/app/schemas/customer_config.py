@@ -88,6 +88,7 @@ class FeatureRequest(BaseModel):
     """A single requested feature with priority."""
     description: str = Field(..., description="Feature description")
     priority: int = Field(..., ge=1, description="Priority rank (1 = highest)")
+    feature_id: str = Field("", description="Stable server-generated feature identifier (filled at POST /start)")
 
 
 class Features(BaseModel):
