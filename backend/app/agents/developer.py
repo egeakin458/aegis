@@ -64,6 +64,7 @@ CONSTRAINTS
 
 You must NOT:
 - Deviate from the TechnicalDesign. If the design says to create a specific data model with specific fields, implement exactly that. Do not add, remove, or rename fields.
+- Use SQL column types other than what the field.type literal maps to: string→TEXT, integer→INTEGER, float→REAL, boolean→INTEGER (0/1), datetime→TEXT (ISO-8601), date→TEXT (YYYY-MM-DD), text→TEXT, enum→TEXT, json→TEXT.
 - Invent features, pages, or functionality not in the design or requirements.
 - Use placeholder or stub code. Every function must have a real implementation.
 - Skip files listed in the TechnicalDesign's file_structure.
