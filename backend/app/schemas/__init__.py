@@ -50,6 +50,17 @@ from .pipeline_events import (
     PipelineState,
     TokenUsage,
 )
+from .customer_config_v2 import (
+    Actor,
+    Attribute,
+    BusinessRule,
+    CustomerConfigV2,
+    DomainEntity,
+    ProjectContext,
+    Relationship,
+    UseCase,
+    SCHEMA_VERSION as DDC_SCHEMA_VERSION,
+)
 from .ra_output import (
     RAOutput,
 )
@@ -98,6 +109,16 @@ __all__ = [
     "ReviewIssue",
     "ReviewVerdict",
     "IssueSeverity",
+    # DDC v1 schema
+    "CustomerConfigV2",
+    "ProjectContext",
+    "Actor",
+    "DomainEntity",
+    "Attribute",
+    "Relationship",
+    "BusinessRule",
+    "UseCase",
+    "DDC_SCHEMA_VERSION",
     # RA output wrapper
     "RAOutput",
     # Pipeline events
