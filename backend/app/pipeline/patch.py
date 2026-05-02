@@ -54,7 +54,7 @@ def apply_patch(previous: CodeOutput, patch: CodePatch) -> CodeOutput:
     existing_paths = [f.path for f in previous.files]
     ordered_files: list[CodeFile] = []
     for path in existing_paths:
-        if path in file_index and path not in [f.path for f in patch.files_to_delete]:
+        if path in file_index and path not in patch.files_to_delete:
             ordered_files.append(file_index.pop(path))
     # Remaining items in file_index are new files (from files_to_replace with new paths)
     ordered_files.extend(file_index.values())

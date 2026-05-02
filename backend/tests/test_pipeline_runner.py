@@ -1740,3 +1740,126 @@ class TestBuildCheck:
         assert len(received_context) >= 2
         assert "build_check_result" in received_context[1]
         assert received_context[1]["build_check_result"].passed is False
+
+
+# ===========================================================================
+# 12. CodePatch revision cycle
+# ===========================================================================
+
+
+def _make_code_patch(
+    files_to_replace: list | None = None,
+    files_to_delete: list | None = None,
+) -> "CodePatch":
+    from app.schemas.agent_outputs import CodePatch as _CodePatch
+    return _CodePatch(
+        reasoning="Fixed the issues.",
+        files_to_replace=files_to_replace or [
+            CodeFile(
+                path="app/orders/page.js",
+                content="export default function OrderList() { return <div>Fixed</div>; }",
+                language="javascript",
+                description="Fixed page",
+            )
+        ],
+        files_to_delete=files_to_delete or [],
+        features_implemented_delta=[],
+    )
+
+
+class TestCodePatchRevision:
+    """Verify Developer emits CodePatch on revision and runner merges it correctly."""
+
+    @pytest.mark.asyncio
+    async def test_code_patch_merged_into_code_output(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """After a revision cycle, context["code_output"] reflects the merged patch."""
+        code_revision_done = {"n": 0}
+        code_output_after_revision: list = []
+
+        original_qa_output_seq = [
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ]
+        qa_side_effects = iter(original_qa_output_seq)
+
+        async def _capture_and_patch(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                code_revision_done["n"] += 1
+                return _make_code_patch()
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_capture_and_patch)
+        agents["qa_reviewer"].execute = AsyncMock(side_effect=lambda ctx, *a, **kw: next(qa_side_effects))
+
+        runner = PipelineRunner(agents=agents)
+        result = await runner.run(valid_customer_config)
+
+        assert code_revision_done["n"] == 1
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_code_patch_replaces_file_content(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """The file content in the merged CodeOutput reflects the patch's replacement."""
+        qa_side_effects = iter([
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ])
+
+        async def _dev_side_effect(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                return _make_code_patch(files_to_replace=[
+                    CodeFile(
+                        path="app/orders/page.js",
+                        content="// PATCHED CONTENT",
+                        language="javascript",
+                        description="Patched file",
+                    )
+                ])
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_dev_side_effect)
+        agents["qa_reviewer"].execute = AsyncMock(
+            side_effect=lambda ctx, *a, **kw: next(qa_side_effects)
+        )
+
+        runner = PipelineRunner(agents=agents)
+        await runner.run(valid_customer_config)
+
+        final_code = runner.context["code_output"]
+        patched_file = next(f for f in final_code.files if f.path == "app/orders/page.js")
+        assert patched_file.content == "// PATCHED CONTENT"
+
+    @pytest.mark.asyncio
+    async def test_code_patch_emits_file_generated_events_with_action(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """FILE_GENERATED events during patch apply include an action discriminator."""
+        events: list = []
+        qa_side_effects = iter([
+            _make_qa_review(ReviewVerdict.REVISE_CODE),
+            _make_qa_review(ReviewVerdict.APPROVE),
+        ])
+
+        async def _dev_side_effect(ctx, *args, **kwargs):
+            if "previous_code" in ctx:
+                return _make_code_patch()
+            return _make_code_output()
+
+        agents = _agents_for_happy_path(valid_finalized_config)
+        agents["developer"].execute = AsyncMock(side_effect=_dev_side_effect)
+        agents["qa_reviewer"].execute = AsyncMock(
+            side_effect=lambda ctx, *a, **kw: next(qa_side_effects)
+        )
+
+        runner = PipelineRunner(agents=agents, emit_event=events.append)
+        await runner.run(valid_customer_config)
+
+        file_gen_events = [e for e in events if e.event_type == EventType.FILE_GENERATED]
+        actions = {e.data.get("action") for e in file_gen_events}
+        assert actions & {"created", "updated"}  # at least one patch file action
