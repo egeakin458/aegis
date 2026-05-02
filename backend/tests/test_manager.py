@@ -48,7 +48,7 @@ def minimal_config() -> CustomerConfig:
         features=Features(
             requested=[FeatureRequest(description="Landing page", priority=1)]
         ),
-        data=DataRequirements(entities="None"),
+        data=DataRequirements(entities=[]),
     )
 
 

@@ -43,11 +43,14 @@ RA_RESPONSE = {
             },
             "features": {
                 "requested": [
-                    {"description": "Menu display with categories", "priority": 1},
-                    {"description": "Shopping cart and checkout", "priority": 2},
+                    {"description": "Menu display with categories", "priority": 1, "feature_id": "feat_menu-display-with-categories_a1b2c3"},
+                    {"description": "Shopping cart and checkout", "priority": 2, "feature_id": "feat_shopping-cart-and-checkout_d4e5f6"},
                 ]
             },
-            "data": {"entities": "Menu items, orders, customers"},
+            "data": {"entities": [
+                {"name": "MenuItem", "description": "A menu item", "estimated_volume": None},
+                {"name": "Order", "description": "A customer order", "estimated_volume": None},
+            ]},
         },
         "assumptions": [
             {
@@ -77,7 +80,7 @@ SA_RESPONSE = {
                 {"name": "price", "type": "float", "required": True},
                 {"name": "category", "type": "string", "required": True},
             ],
-            "relationships": ["has_many:OrderItem"],
+            "relationships": [{"kind": "has_many", "target_model": "OrderItem", "description": None}],
         },
         {
             "name": "Order",
@@ -87,7 +90,7 @@ SA_RESPONSE = {
                 {"name": "status", "type": "enum", "required": True},
                 {"name": "created_at", "type": "datetime", "required": True},
             ],
-            "relationships": ["has_many:OrderItem"],
+            "relationships": [{"kind": "has_many", "target_model": "OrderItem", "description": None}],
         },
     ],
     "api_endpoints": [

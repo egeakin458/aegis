@@ -53,7 +53,11 @@ def valid_customer_config() -> CustomerConfig:
                 FeatureRequest(description="Shopping cart and checkout", priority=2, feature_id="feat_shopping-cart-and-checkout_d4e5f6"),
             ]
         ),
-        data=DataRequirements(entities="Menu items, orders, customers"),
+        data=DataRequirements(entities=[
+            {"name": "MenuItem", "description": "A single item on the cafe menu", "estimated_volume": None},
+            {"name": "Order", "description": "A customer order", "estimated_volume": None},
+            {"name": "Customer", "description": "A registered customer", "estimated_volume": None},
+        ]),
     )
 
 

@@ -85,7 +85,11 @@ def sample_customer_config() -> CustomerConfig:
                 FeatureRequest(description="Order status tracking", priority=3),
             ]
         ),
-        data=DataRequirements(entities="Menu items, orders, customers"),
+        data=DataRequirements(entities=[
+            {"name": "MenuItem", "description": "A menu item", "estimated_volume": None},
+            {"name": "Order", "description": "A customer order", "estimated_volume": None},
+            {"name": "Customer", "description": "A customer", "estimated_volume": None},
+        ]),
     )
 
 
@@ -122,7 +126,7 @@ def sample_technical_design() -> TechnicalDesign:
                     DataField(name="price", type="float", required=True),
                     DataField(name="category", type="string", required=True),
                 ],
-                relationships=["has_many:OrderItem"],
+                relationships=[{"kind": "has_many", "target_model": "OrderItem", "description": None}],
             ),
         ],
         api_endpoints=[
@@ -220,7 +224,7 @@ class TestCustomerConfig:
             features=Features(
                 requested=[FeatureRequest(description="Landing page", priority=1)]
             ),
-            data=DataRequirements(entities="None"),
+            data=DataRequirements(entities=[]),
         )
         assert config.design.style == DesignStyle.NO_PREFERENCE
         assert config.technical.mobile == MobileSupport.NICE_TO_HAVE
