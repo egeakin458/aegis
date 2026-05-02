@@ -40,7 +40,7 @@ export interface AgentStartEntry extends BaseEntry { type: 'agent-start'; agentL
 export interface AgentCompleteEntry extends BaseEntry { type: 'agent-complete'; agentLabel: string; tokensUsed: number; durationMs: number }
 export interface MessageEntry extends BaseEntry { type: 'message'; text: string }
 export interface ProgressUpdateEntry extends BaseEntry { type: 'progress-update'; text: string }
-export interface FileGeneratedEntry extends BaseEntry { type: 'file-generated'; path: string; language: string }
+export interface FileGeneratedEntry extends BaseEntry { type: 'file-generated'; path: string; language: string; action?: 'created' | 'updated' | 'removed' }
 export interface ClarificationQuestion { id: string; question: string; answer?: string }
 export interface ClarificationEntry extends BaseEntry { type: 'clarification'; questions: ClarificationQuestion[]; submitted: boolean }
 export interface ConfigFinalizedEntry extends BaseEntry { type: 'config-finalized'; projectSummary: string; assumptions: string[] }

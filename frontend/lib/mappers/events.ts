@@ -83,6 +83,7 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         id, type: 'file-generated', agent, timestamp,
         path: (d.path as string) ?? '',
         language: (d.language as string) ?? '',
+        action: (d.action as 'created' | 'updated' | 'removed') ?? undefined,
       }
 
     case 'progress_update':
