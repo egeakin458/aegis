@@ -9,9 +9,16 @@ before being passed to the next agent.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+DataFieldType = Literal[
+    "string", "integer", "float", "boolean",
+    "datetime", "date", "text", "enum", "json",
+]
+
+RelationshipKind = Literal["belongs_to", "has_many", "has_one", "many_to_many"]
 
 
 # ============================================================
@@ -28,10 +35,17 @@ from pydantic import BaseModel, Field
 class DataField(BaseModel):
     """A single field in a data model."""
     name: str
-    type: str = Field(..., description="Data type: string | integer | float | boolean | datetime | text | enum")
+    type: DataFieldType = Field(..., description="Data type: string | integer | float | boolean | datetime | date | text | enum | json")
     required: bool = True
     description: Optional[str] = None
     constraints: Optional[str] = Field(None, description="e.g., 'unique', 'max_length:255', 'enum:active,inactive'")
+
+
+class DataRelationship(BaseModel):
+    """A typed relationship between two data models."""
+    kind: RelationshipKind = Field(..., description="belongs_to | has_many | has_one | many_to_many")
+    target_model: str = Field(..., description="Name of the related DataModel (matches DataModel.name)")
+    description: Optional[str] = None
 
 
 class DataModel(BaseModel):
@@ -39,7 +53,7 @@ class DataModel(BaseModel):
     name: str = Field(..., description="Model name in PascalCase, e.g., 'CustomerOrder'")
     description: str
     fields: list[DataField]
-    relationships: list[str] = Field(default_factory=list, description="e.g., 'belongs_to:Customer', 'has_many:OrderItem'")
+    relationships: list[DataRelationship] = Field(default_factory=list, description="Typed relationships to other models")
 
 
 class APIEndpoint(BaseModel):
