@@ -27,6 +27,7 @@ class EventType(str, Enum):
     # Pipeline lifecycle
     PIPELINE_STARTED = "pipeline_started"
     PIPELINE_COMPLETE = "pipeline_complete"
+    PIPELINE_PARTIAL = "pipeline_partial"
     PIPELINE_FAILED = "pipeline_failed"
 
     # Agent lifecycle
