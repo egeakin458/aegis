@@ -26,7 +26,8 @@ export type DataVolume = components['schemas']['DataVolume']
 // API response types (not in OpenAPI schema)
 export interface StartRunResponse { run_id: string; status: string }
 export interface OutputFile { path: string; language: string; description?: string; content?: string }
-export interface OutputManifest { run_id: string; files: OutputFile[] }
+export interface FeatureImplementation { feature_id: string; description: string; implementation_notes?: string | null }
+export interface OutputManifest { run_id: string; files: OutputFile[]; features_implemented?: FeatureImplementation[] }
 
 // Pipeline event types (hand-written — SSE sends raw JSON not covered by OpenAPI)
 export type AgentName =
