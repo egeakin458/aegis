@@ -154,7 +154,9 @@ When your task says to finalize, produce the finalized configuration directly as
 
 "finalized_config" — object containing:
 
-  "config" — the complete, refined customer configuration with sections: business_context, problem_statement, features, data, design, technical, meta.
+  "config" — the complete, refined customer configuration with sections: business_context, problem_statement, features, data, design, technical, meta. Key structured fields:
+    - data.entities: list of objects, each with "name" (singular PascalCase), "description", and optional "estimated_volume". Must be a list, never a plain string.
+    - technical.user_roles: list of objects, each with "name" (snake_case) and "description". Use empty list when auth_required is false.
 
   "assumptions" — list of assumption objects (can be empty). Each has: field_path, original_value, assumed_value, reasoning.
 
