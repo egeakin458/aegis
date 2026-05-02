@@ -95,6 +95,13 @@ class CodeFile(BaseModel):
     description: str = Field(..., description="Human-readable description of what this file does")
 
 
+class FeatureImplementation(BaseModel):
+    """A single implemented feature, linked to its feature_id."""
+    feature_id: str = Field(..., description="Matches FeatureRequest.feature_id from FinalizedConfig")
+    description: str = Field(..., description="Human-readable feature description")
+    implementation_notes: Optional[str] = Field(None, description="How the feature was implemented")
+
+
 class CodeOutput(BaseModel):
     """
     Output of the Developer agent.
@@ -104,7 +111,7 @@ class CodeOutput(BaseModel):
     project_name: str = Field(..., description="Application name in kebab-case, must match TechnicalDesign.project_name")
     files: list[CodeFile] = Field(..., min_length=1)
     setup_instructions: str = Field(..., description="How to install dependencies and run the project")
-    features_implemented: list[str] = Field(..., description="List of features from the requirements that were implemented")
+    features_implemented: list[FeatureImplementation] = Field(..., description="List of features implemented, each citing the feature_id from FinalizedConfig")
     known_limitations: list[str] = Field(default_factory=list, description="Any features that were simplified or omitted")
 
 
@@ -135,6 +142,13 @@ class ReviewIssue(BaseModel):
     suggestion: str = Field(..., description="Specific, actionable fix suggestion")
 
 
+class FeatureCoverage(BaseModel):
+    """Coverage status for a single feature, keyed by feature_id."""
+    feature_id: str = Field(..., description="Matches FeatureRequest.feature_id from FinalizedConfig")
+    implemented: bool = Field(..., description="Whether the feature was implemented")
+    evidence: Optional[str] = Field(None, description="Brief evidence or reason for the coverage decision")
+
+
 class QAReview(BaseModel):
     """
     Output of the QA Reviewer agent.
@@ -143,9 +157,9 @@ class QAReview(BaseModel):
     reasoning: str = Field(..., description="Reviewer's overall assessment reasoning")
     verdict: ReviewVerdict = Field(..., description="approve | revise_code | revise_design")
     issues: list[ReviewIssue] = Field(default_factory=list)
-    requirements_coverage: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Map of requirement descriptions to whether they were implemented"
+    requirements_coverage: list[FeatureCoverage] = Field(
+        default_factory=list,
+        description="Coverage status for each feature from FinalizedConfig, keyed by feature_id"
     )
     code_quality_score: int = Field(..., ge=1, le=5, description="Overall code quality rating 1-5")
     summary: str = Field(..., description="Human-readable review summary for the UI")
