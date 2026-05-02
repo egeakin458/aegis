@@ -131,6 +131,25 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         partial: true,
       }
 
+    case 'build_check_start':
+      return { id, type: 'message', agent, timestamp, text: event.message }
+
+    case 'build_check_complete':
+    case 'build_check_failed': {
+      const issues = (d.issues as Array<{
+        file: string; line?: number | null; column?: number | null
+        severity: 'error' | 'warning'; message: string; check: string
+      }>) ?? []
+      const passed = event.event_type === 'build_check_complete'
+      return {
+        id, type: 'build-check', agent, timestamp,
+        passed,
+        filesChecked: (d.files_checked as number) ?? 0,
+        durationMs: (d.duration_ms as number) ?? 0,
+        issues,
+      }
+    }
+
     // Intentionally ignored event types
     case 'pipeline_started':
     case 'llm_call_start':

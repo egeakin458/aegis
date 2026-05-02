@@ -8,6 +8,8 @@ const MESSAGES: Record<OrbitPhase, { title: string; sub: string }> = {
   'ra-clarification': { title: 'Waiting', sub: 'Clarification needed' },
   'sa-running': { title: 'Designing', sub: 'Solution Architect is working' },
   'dev-running': { title: 'Building', sub: 'Developer is writing code' },
+  'build-check-running': { title: 'Checking', sub: 'Verifying code structure' },
+  'build-check-failed': { title: 'Fixing', sub: 'Build errors found — revising' },
   'qa-running': { title: 'Reviewing', sub: 'QA Reviewer is checking quality' },
   'dev-revising': { title: 'Revising', sub: 'Developer updating code' },
   'sa-revising': { title: 'Revising', sub: 'Architect updating design' },

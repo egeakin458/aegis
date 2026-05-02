@@ -49,11 +49,12 @@ export type EventType =
   | 'revision_requested' | 'revision_started'
   | 'validation_passed' | 'validation_failed'
   | 'file_generated' | 'progress_update'
+  | 'build_check_start' | 'build_check_complete' | 'build_check_failed'
   | 'error'
 
 export type PipelineStateValue =
   | 'intake' | 'requirements' | 'clarification' | 'design' | 'development'
-  | 'review' | 'code_revision' | 'design_revision' | 'complete' | 'failed'
+  | 'build_check' | 'review' | 'code_revision' | 'design_revision' | 'complete' | 'failed'
 
 export interface TokenUsage { input_tokens: number; output_tokens: number }
 

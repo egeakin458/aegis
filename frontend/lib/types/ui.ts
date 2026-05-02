@@ -6,6 +6,8 @@ export type OrbitPhase =
   | 'ra-clarification'
   | 'sa-running'
   | 'dev-running'
+  | 'build-check-running'
+  | 'build-check-failed'
   | 'qa-running'
   | 'dev-revising'
   | 'sa-revising'
@@ -23,6 +25,7 @@ export type ConsoleEntryType =
   | 'clarification'
   | 'config-finalized'
   | 'revision-requested'
+  | 'build-check'
   | 'error-entry'
   | 'summary'
 
@@ -45,10 +48,13 @@ export interface RevisionRequestedEntry extends BaseEntry { type: 'revision-requ
 export interface ErrorEntry extends BaseEntry { type: 'error-entry'; message: string; detail?: string; terminal: boolean }
 export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number; partial?: boolean }
 
+export interface BuildCheckIssue { file: string; line?: number | null; column?: number | null; severity: 'error' | 'warning'; message: string; check: string }
+export interface BuildCheckEntry extends BaseEntry { type: 'build-check'; passed: boolean; filesChecked: number; durationMs: number; issues: BuildCheckIssue[] }
+
 export type ConsoleEntry =
   | AgentStartEntry | AgentCompleteEntry | MessageEntry | ProgressUpdateEntry
   | FileGeneratedEntry | ClarificationEntry | ConfigFinalizedEntry
-  | RevisionRequestedEntry | ErrorEntry | SummaryEntry
+  | RevisionRequestedEntry | BuildCheckEntry | ErrorEntry | SummaryEntry
 
 export interface PipelineState {
   phase: OrbitPhase

@@ -24,6 +24,10 @@ export function derivePhase(
     case 'clarification_needed': return 'ra-clarification'
     case 'clarification_received': return 'ra-running'
 
+    case 'build_check_start': return 'build-check-running'
+    case 'build_check_complete': return 'build-check-running'
+    case 'build_check_failed': return 'build-check-failed'
+
     case 'pipeline_complete': return 'complete'
     case 'pipeline_partial': return 'complete'
     case 'pipeline_failed': return 'error'
