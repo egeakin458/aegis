@@ -418,7 +418,7 @@ class PipelineRunner:
         )
 
         self.context["code_output"] = result
-        return PipelineState.REVIEW
+        return PipelineState.BUILD_CHECK
 
     async def _run_design_revision(self) -> PipelineState:
         """Re-run the Solution Architect with QA feedback."""

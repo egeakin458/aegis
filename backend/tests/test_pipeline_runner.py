@@ -1597,3 +1597,146 @@ class TestPipelinePartialEvent:
         event_types = _event_types(result.events)
         assert EventType.PIPELINE_COMPLETE in event_types
         assert EventType.PIPELINE_PARTIAL not in event_types
+
+
+# ===========================================================================
+# 11. BUILD_CHECK state transitions
+# ===========================================================================
+
+
+def _make_build_fail_result(n_errors: int = 1) -> BuildCheckResult:
+    return BuildCheckResult(
+        passed=False,
+        duration_ms=10,
+        files_checked=3,
+        issues=[
+            BuildCheckIssue(
+                file="app/page.js",
+                severity="error",
+                message="SyntaxError: Unexpected token",
+                check="syntax_js",
+            )
+            for _ in range(n_errors)
+        ],
+    )
+
+
+class TestBuildCheck:
+    """Verify BUILD_CHECK state transitions: pass → REVIEW, fail → CODE_REVISION → pass → REVIEW."""
+
+    @pytest.mark.asyncio
+    async def test_build_check_pass_transitions_to_review(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check passes, QA Reviewer should be called once (normal flow)."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        assert result.state == PipelineState.COMPLETE
+        agents["qa_reviewer"].execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_build_check_pass_emits_build_check_start_and_complete(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        agents = _agents_for_happy_path(valid_finalized_config)
+        passing = BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=passing)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        event_types = _event_types(result.events)
+        assert EventType.BUILD_CHECK_START in event_types
+        assert EventType.BUILD_CHECK_COMPLETE in event_types
+        assert EventType.BUILD_CHECK_FAILED not in event_types
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_triggers_code_revision(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check fails and cap not reached, Developer is called again."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        # First call fails, second passes
+        call_count = {"n": 0}
+
+        async def _side_effect(_co):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return _make_build_fail_result()
+            return BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        # Developer called twice: initial + code revision
+        assert agents["developer"].execute.call_count == 2
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_emits_build_check_failed_event(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        agents = _agents_for_happy_path(valid_finalized_config)
+
+        async def _side_effect(_co):
+            return _make_build_fail_result()
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents, emit_event=lambda e: None)
+            # cap will be reached after 2 revisions → partial
+            result = await runner.run(valid_customer_config)
+
+        event_types = _event_types(result.events)
+        assert EventType.BUILD_CHECK_FAILED in event_types
+
+    @pytest.mark.asyncio
+    async def test_build_check_fail_at_cap_marks_partial(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """When build check always fails and cap is exhausted, outcome is partial."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        always_fail = BuildCheckResult(passed=False, duration_ms=10, files_checked=3, issues=[
+            BuildCheckIssue(file="app/page.js", severity="error", message="SyntaxError", check="syntax_js")
+        ])
+        with patch("app.pipeline.runner.run_build_check", new=AsyncMock(return_value=always_fail)):
+            runner = PipelineRunner(agents=agents)
+            result = await runner.run(valid_customer_config)
+
+        assert result.outcome == "partial"
+        assert result.state == PipelineState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_build_check_context_includes_build_check_result_on_revision(
+        self, valid_customer_config, valid_finalized_config
+    ):
+        """Developer receives build_check_result in context during code revision."""
+        agents = _agents_for_happy_path(valid_finalized_config)
+        call_count = {"n": 0}
+        received_context: list[dict] = []
+
+        original_execute = agents["developer"].execute.side_effect
+
+        async def _capture_context(ctx, *args, **kwargs):
+            received_context.append(dict(ctx))
+            return _make_code_output()
+
+        agents["developer"].execute = AsyncMock(side_effect=_capture_context)
+
+        async def _side_effect(_co):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return _make_build_fail_result()
+            return BuildCheckResult(passed=True, duration_ms=5, files_checked=3)
+
+        with patch("app.pipeline.runner.run_build_check", new=_side_effect):
+            runner = PipelineRunner(agents=agents)
+            await runner.run(valid_customer_config)
+
+        # Second call (code revision) should have build_check_result in context
+        assert len(received_context) >= 2
+        assert "build_check_result" in received_context[1]
+        assert received_context[1]["build_check_result"].passed is False
