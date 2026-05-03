@@ -1,4 +1,6 @@
-import type { IntakeFormValues } from '@/lib/schemas/intake-form'
+import type { IntakeFormValues, FreeTextFormValues } from '@/lib/schemas/intake-form'
+import type { CustomerConfigV2 } from '@/lib/schemas/ddc'
+import { mapFreeTextToDDC } from '@/lib/mappers/free-text'
 import type {
   CustomerConfig,
   IndustryType,
@@ -58,6 +60,16 @@ const ACCESS_SCOPE_MAP: Record<string, string> = {
   'Just Me': 'just_me',
   'Team / Network': 'team_network',
   'Anyone on the Internet': 'anyone_internet',
+}
+
+/**
+ * Produce a CustomerConfigV2 (DDC) from free-text intake form values.
+ * Delegates to mapFreeTextToDDC; export kept here for call-site consistency.
+ * The legacy mapFormToCustomerConfig is preserved for backward compatibility
+ * and will be deleted in C15.
+ */
+export function mapFormToDDC(form: FreeTextFormValues): CustomerConfigV2 {
+  return mapFreeTextToDDC(form)
 }
 
 export function mapFormToCustomerConfig(form: IntakeFormValues): CustomerConfig {
