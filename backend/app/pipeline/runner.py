@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, Union
 from uuid import uuid4
 
 from app.agents.base import BaseAgent
@@ -35,6 +35,7 @@ from app.schemas.customer_config import (
     CustomerConfig,
     FinalizedConfig,
 )
+from app.schemas.customer_config_v2 import CustomerConfigV2
 from app.schemas.pipeline_events import (
     AgentName,
     EventType,
@@ -43,7 +44,7 @@ from app.schemas.pipeline_events import (
     PipelineState,
     TokenUsage,
 )
-from app.schemas.ra_output import RAOutput
+from app.schemas.ra_output import RAOutput, RAOutputDDC
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class PipelineRunner:
     ) -> None:
         self.agents = agents
         self._emit = emit_event or (lambda e: None)
+        self._use_ddc = settings.use_ddc
 
         # Pipeline run state
         self.current_run: Optional[PipelineRun] = None
@@ -101,7 +103,7 @@ class PipelineRunner:
                 self.current_run.total_tokens.output_tokens += event.tokens_used.output_tokens
         self._emit(event)
 
-    async def run(self, customer_config: CustomerConfig) -> PipelineRun:
+    async def run(self, customer_config: Union[CustomerConfig, CustomerConfigV2]) -> PipelineRun:
         """
         Start a new pipeline run from a customer config.
 
@@ -109,7 +111,10 @@ class PipelineRunner:
         is paused waiting for customer answers. Call resume() to continue.
         """
         self.current_run = PipelineRun()
-        self.context = {"customer_config": customer_config}
+        if self._use_ddc:
+            self.context = {"customer_config_v2": customer_config}
+        else:
+            self.context = {"customer_config": customer_config}
         self.clarification_history = []
         self.code_revision_count = 0
         self.design_revision_count = 0
@@ -248,19 +253,33 @@ class PipelineRunner:
                 "finalized_config after the clarification round cap was reached. "
                 "The agent did not obey the finalize instruction."
             )
-        finalized = result.finalized_config
-        self.context["finalized_config"] = finalized
 
-        self.emit_event(PipelineEvent(
-            run_id=self.current_run.run_id,
-            agent=AgentName.REQUIREMENTS_ANALYST,
-            event_type=EventType.CONFIG_FINALIZED,
-            message="Requirements confirmed! Here's your project brief.",
-            data={
-                "project_summary": finalized.project_summary,
-                "assumptions_count": len(finalized.assumptions),
-            },
-        ))
+        if self._use_ddc:
+            ddc = result.finalized_config  # CustomerConfigV2
+            self.context["customer_config_v2"] = ddc
+            self.emit_event(PipelineEvent(
+                run_id=self.current_run.run_id,
+                agent=AgentName.REQUIREMENTS_ANALYST,
+                event_type=EventType.CONFIG_FINALIZED,
+                message="Requirements confirmed! Here's your project brief.",
+                data={
+                    "project_summary": ddc.context.domain_description,
+                    "assumptions_count": 0,
+                },
+            ))
+        else:
+            finalized = result.finalized_config
+            self.context["finalized_config"] = finalized
+            self.emit_event(PipelineEvent(
+                run_id=self.current_run.run_id,
+                agent=AgentName.REQUIREMENTS_ANALYST,
+                event_type=EventType.CONFIG_FINALIZED,
+                message="Requirements confirmed! Here's your project brief.",
+                data={
+                    "project_summary": finalized.project_summary,
+                    "assumptions_count": len(finalized.assumptions),
+                },
+            ))
 
         return PipelineState.DESIGN
 
@@ -268,9 +287,10 @@ class PipelineRunner:
         """Run the Solution Architect agent."""
         sa = self.agents["solution_architect"]
 
-        sa_context = {
-            "finalized_config": self.context["finalized_config"],
-        }
+        if self._use_ddc:
+            sa_context = {"customer_config_v2": self.context["customer_config_v2"]}
+        else:
+            sa_context = {"finalized_config": self.context["finalized_config"]}
 
         result = await sa.execute(
             sa_context, self.current_run.run_id, self.emit_event
@@ -283,10 +303,16 @@ class PipelineRunner:
         """Run the Developer agent."""
         dev = self.agents["developer"]
 
-        dev_context = {
-            "finalized_config": self.context["finalized_config"],
-            "technical_design": self.context["technical_design"],
-        }
+        if self._use_ddc:
+            dev_context = {
+                "customer_config_v2": self.context["customer_config_v2"],
+                "technical_design": self.context["technical_design"],
+            }
+        else:
+            dev_context = {
+                "finalized_config": self.context["finalized_config"],
+                "technical_design": self.context["technical_design"],
+            }
 
         result = await dev.execute(
             dev_context, self.current_run.run_id, self.emit_event
@@ -346,11 +372,18 @@ class PipelineRunner:
         """Run the QA Reviewer agent."""
         qa = self.agents["qa_reviewer"]
 
-        qa_context = {
-            "finalized_config": self.context["finalized_config"],
-            "technical_design": self.context["technical_design"],
-            "code_output": self.context["code_output"],
-        }
+        if self._use_ddc:
+            qa_context = {
+                "customer_config_v2": self.context["customer_config_v2"],
+                "technical_design": self.context["technical_design"],
+                "code_output": self.context["code_output"],
+            }
+        else:
+            qa_context = {
+                "finalized_config": self.context["finalized_config"],
+                "technical_design": self.context["technical_design"],
+                "code_output": self.context["code_output"],
+            }
 
         result = await qa.execute(
             qa_context, self.current_run.run_id, self.emit_event
@@ -407,13 +440,22 @@ class PipelineRunner:
 
         dev = self.agents["developer"]
 
-        dev_context = {
-            "finalized_config": self.context["finalized_config"],
-            "technical_design": self.context["technical_design"],
-            "previous_code": self.context["code_output"],
-            "qa_review": self.context.get("qa_review"),
-            "build_check_result": self.context.get("build_check_result"),
-        }
+        if self._use_ddc:
+            dev_context = {
+                "customer_config_v2": self.context["customer_config_v2"],
+                "technical_design": self.context["technical_design"],
+                "previous_code": self.context["code_output"],
+                "qa_review": self.context.get("qa_review"),
+                "build_check_result": self.context.get("build_check_result"),
+            }
+        else:
+            dev_context = {
+                "finalized_config": self.context["finalized_config"],
+                "technical_design": self.context["technical_design"],
+                "previous_code": self.context["code_output"],
+                "qa_review": self.context.get("qa_review"),
+                "build_check_result": self.context.get("build_check_result"),
+            }
 
         result = await dev.execute(
             dev_context, self.current_run.run_id, self.emit_event
@@ -471,11 +513,18 @@ class PipelineRunner:
 
         sa = self.agents["solution_architect"]
 
-        sa_context = {
-            "finalized_config": self.context["finalized_config"],
-            "previous_design": self.context["technical_design"],
-            "qa_review": self.context["qa_review"],
-        }
+        if self._use_ddc:
+            sa_context = {
+                "customer_config_v2": self.context["customer_config_v2"],
+                "previous_design": self.context["technical_design"],
+                "qa_review": self.context["qa_review"],
+            }
+        else:
+            sa_context = {
+                "finalized_config": self.context["finalized_config"],
+                "previous_design": self.context["technical_design"],
+                "qa_review": self.context["qa_review"],
+            }
 
         result = await sa.execute(
             sa_context, self.current_run.run_id, self.emit_event

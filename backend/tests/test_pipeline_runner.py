@@ -1863,3 +1863,141 @@ class TestCodePatchRevision:
         file_gen_events = [e for e in events if e.event_type == EventType.FILE_GENERATED]
         actions = {e.data.get("action") for e in file_gen_events}
         assert actions & {"created", "updated"}  # at least one patch file action
+
+
+# ===========================================================================
+# 13. DDC mode — CustomerConfigV2 threading through the pipeline
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+class TestDDCPipeline:
+    """DDC mode end-to-end runner tests (settings.use_ddc=True)."""
+
+    @pytest.fixture(autouse=True)
+    def patch_ddc(self, monkeypatch):
+        monkeypatch.setattr("app.pipeline.runner.settings.use_ddc", True)
+        monkeypatch.setattr("app.config.settings.use_ddc", True)
+
+    def _make_runner(self, agents: dict, events: list) -> PipelineRunner:
+        return PipelineRunner(agents=agents, emit_event=events.append)
+
+    def _agents_for_ddc_happy_path(self, ddc) -> dict:
+        from app.schemas.ra_output import RAOutputDDC
+
+        ra_result = RAOutputDDC(
+            needs_clarification=False,
+            reasoning="DDC validated and complete.",
+            finalized_config=ddc,
+        )
+        return {
+            "requirements_analyst": _make_mock_agent(AgentName.REQUIREMENTS_ANALYST, ra_result),
+            "solution_architect": _make_mock_agent(AgentName.SOLUTION_ARCHITECT, _make_technical_design()),
+            "developer": _make_mock_agent(AgentName.DEVELOPER, _make_code_output()),
+            "qa_reviewer": _make_mock_agent(AgentName.QA_REVIEWER, _make_qa_review(ReviewVerdict.APPROVE)),
+        }
+
+    async def test_ddc_pipeline_reaches_complete(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        result = await runner.run(ddc_ecommerce)
+        assert result.state == PipelineState.COMPLETE
+        assert result.outcome == "success"
+
+    async def test_ddc_pipeline_emits_config_finalized_event(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        event_types = [e.event_type for e in events]
+        assert EventType.CONFIG_FINALIZED in event_types
+
+    async def test_ddc_config_finalized_event_uses_domain_description(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        config_finalized = next(e for e in events if e.event_type == EventType.CONFIG_FINALIZED)
+        assert config_finalized.data["project_summary"] == ddc_ecommerce.context.domain_description
+
+    async def test_ddc_context_has_customer_config_v2_not_finalized_config(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        assert "customer_config_v2" in runner.context
+        assert "finalized_config" not in runner.context
+
+    async def test_ddc_sa_receives_customer_config_v2(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        sa_context = agents["solution_architect"].execute.call_args[0][0]
+        assert "customer_config_v2" in sa_context
+        assert "finalized_config" not in sa_context
+
+    async def test_ddc_dev_receives_customer_config_v2_and_technical_design(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        dev_context = agents["developer"].execute.call_args[0][0]
+        assert "customer_config_v2" in dev_context
+        assert "technical_design" in dev_context
+        assert "finalized_config" not in dev_context
+
+    async def test_ddc_qa_receives_customer_config_v2_technical_design_and_code_output(self, ddc_ecommerce):
+        events = []
+        agents = self._agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        qa_context = agents["qa_reviewer"].execute.call_args[0][0]
+        assert "customer_config_v2" in qa_context
+        assert "technical_design" in qa_context
+        assert "code_output" in qa_context
+        assert "finalized_config" not in qa_context
+
+    async def test_ddc_code_revision_context_includes_customer_config_v2(self, ddc_ecommerce):
+        """On code revision, Developer must still receive customer_config_v2."""
+        from app.schemas.ra_output import RAOutputDDC
+
+        events = []
+        ra_result = RAOutputDDC(
+            needs_clarification=False,
+            reasoning="Ready.",
+            finalized_config=ddc_ecommerce,
+        )
+        dev_contexts: list[dict] = []
+
+        async def _dev_execute(ctx, *args, **kwargs):
+            dev_contexts.append(dict(ctx))
+            return _make_code_output()
+
+        dev = MagicMock(spec=BaseAgent)
+        dev.execute = AsyncMock(side_effect=_dev_execute)
+
+        qa = MagicMock(
+            spec=BaseAgent,
+            execute=AsyncMock(
+                side_effect=[
+                    _make_qa_review(ReviewVerdict.REVISE_CODE),
+                    _make_qa_review(ReviewVerdict.APPROVE),
+                ]
+            ),
+        )
+        agents = {
+            "requirements_analyst": _make_mock_agent(AgentName.REQUIREMENTS_ANALYST, ra_result),
+            "solution_architect": _make_mock_agent(AgentName.SOLUTION_ARCHITECT, _make_technical_design()),
+            "developer": dev,
+            "qa_reviewer": qa,
+        }
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+
+        assert len(dev_contexts) == 2
+        revision_ctx = dev_contexts[1]
+        assert "customer_config_v2" in revision_ctx
+        assert "previous_code" in revision_ctx
+        assert "finalized_config" not in revision_ctx

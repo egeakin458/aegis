@@ -83,6 +83,25 @@ class TestStartPipeline:
         response = client.post("/api/pipeline/start", json=valid_config_payload)
         assert response.status_code == 422
 
+    def test_start_accepts_ddc_payload(self, client, ddc_ecommerce):
+        """POST /start must accept a valid CustomerConfigV2 payload."""
+        with patch("app.api.routes.runner_manager") as mock_manager:
+            mock_manager.start_run = AsyncMock(return_value="run-ddc-001")
+            payload = ddc_ecommerce.model_dump(mode="json")
+            response = client.post("/api/pipeline/start", json=payload)
+            assert response.status_code == 201
+            data = response.json()
+            assert data["run_id"] == "run-ddc-001"
+            assert data["status"] == "started"
+
+    def test_start_invalid_ddc_payload_returns_422(self, client):
+        """An invalid DDC payload (schema_version set but content wrong) → 422."""
+        response = client.post(
+            "/api/pipeline/start",
+            json={"schema_version": "ddc-v1", "bad": "data"},
+        )
+        assert response.status_code == 422
+
 
 # ============================================================
 # POST /api/pipeline/{run_id}/clarification

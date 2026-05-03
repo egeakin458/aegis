@@ -9,13 +9,16 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from typing import Union
+
 from app.schemas.customer_config import CustomerConfig
+from app.schemas.customer_config_v2 import CustomerConfigV2
 from app.schemas.pipeline_events import PipelineEvent, PipelineRun
 
 from .database import get_connection
 
 
-async def save_run(run: PipelineRun, customer_config: CustomerConfig) -> None:
+async def save_run(run: PipelineRun, customer_config: Union[CustomerConfig, CustomerConfigV2]) -> None:
     """Insert a new pipeline run record."""
     conn = await get_connection()
     await conn.execute(
