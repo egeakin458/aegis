@@ -63,6 +63,7 @@ from .customer_config_v2 import (
 )
 from .ra_output import (
     RAOutput,
+    RAOutputDDC,
 )
 from .evaluation import (
     BenchmarkTask,
@@ -121,6 +122,7 @@ __all__ = [
     "DDC_SCHEMA_VERSION",
     # RA output wrapper
     "RAOutput",
+    "RAOutputDDC",
     # Pipeline events
     "PipelineEvent",
     "PipelineRun",
