@@ -376,10 +376,10 @@ class RequirementsAnalyst(BaseAgent):
         )
 
     def _select_output_schema(self, context: dict[str, Any]) -> Type[BaseModel]:
-        return RAOutputDDC if self._use_ddc else RAOutput
+        return RAOutputDDC if settings.use_ddc else RAOutput
 
     def build_user_prompt(self, context: dict[str, Any]) -> str:
-        if self._use_ddc:
+        if settings.use_ddc:
             return self._build_user_prompt_ddc(context)
         return self._build_user_prompt_legacy(context)
 

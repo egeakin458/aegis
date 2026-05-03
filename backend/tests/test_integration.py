@@ -245,6 +245,7 @@ def _build_pipeline_with_mocked_llm() -> tuple[PipelineRunner, list]:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestFullPipelineIntegration:
     """End-to-end pipeline run: CustomerConfig → COMPLETE."""
 
@@ -406,6 +407,7 @@ class TestFullPipelineIntegration:
         assert qa_review.verdict.value == "approve"
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestPipelineWithClarification:
     """Integration test with a clarification round."""
 
@@ -472,6 +474,7 @@ class TestPipelineWithClarification:
         assert result.outcome == "success"
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestPipelineWithCodeRevision:
     """Integration test with a code revision loop."""
 

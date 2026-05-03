@@ -238,7 +238,7 @@ class Developer(BaseAgent):
         return CodeOutput
 
     def build_user_prompt(self, context: dict[str, Any]) -> str:
-        if self._use_ddc:
+        if settings.use_ddc:
             return self._build_user_prompt_ddc(context)
         return self._build_user_prompt_legacy(context)
 

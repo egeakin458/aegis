@@ -242,6 +242,7 @@ class TestHandlerRegistry:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestHappyPath:
     """Full pipeline run that touches all 4 agents and reaches COMPLETE."""
 
@@ -406,6 +407,7 @@ class TestHappyPath:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestClarificationLoop:
     """RA returns needs_clarification=True → pipeline pauses → resume() continues."""
 
@@ -686,6 +688,7 @@ class TestClarificationLoop:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestCodeRevisionLoop:
     """QA returns revise_code → Developer reruns, max 2 cycles."""
 
@@ -849,6 +852,7 @@ class TestCodeRevisionLoop:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestDesignRevisionLoop:
     """QA returns revise_design → SA reruns, then Dev reruns."""
 
@@ -956,6 +960,7 @@ class TestDesignRevisionLoop:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestDesignRevisionCapFallback:
     """When design revision cap (1) is hit, falls back to code revision or partial."""
 
@@ -1034,6 +1039,7 @@ class TestDesignRevisionCapFallback:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestContextPassing:
     """Each agent must receive exactly the right keys in its context dict."""
 
@@ -1436,6 +1442,7 @@ class TestTokenAccumulation:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestPipelineRunnerInit:
     """Structural / edge-case tests for the runner itself."""
 
@@ -1542,6 +1549,7 @@ class TestPipelineRunnerInit:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestPipelinePartialEvent:
     """When a revision cap is hit, PIPELINE_PARTIAL is emitted (not PIPELINE_COMPLETE)."""
 
@@ -1621,6 +1629,7 @@ def _make_build_fail_result(n_errors: int = 1) -> BuildCheckResult:
     )
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestBuildCheck:
     """Verify BUILD_CHECK state transitions: pass → REVIEW, fail → CODE_REVISION → pass → REVIEW."""
 
@@ -1767,6 +1776,7 @@ def _make_code_patch(
     )
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestCodePatchRevision:
     """Verify Developer emits CodePatch on revision and runner merges it correctly."""
 

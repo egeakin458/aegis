@@ -263,6 +263,7 @@ class TestRAOutputSchema:
 # 2. RequirementsAnalyst.build_user_prompt()
 # ===========================================================================
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestBuildUserPrompt:
     """Tests for the three prompt construction branches."""
 
@@ -446,6 +447,7 @@ class TestBuildUserPrompt:
 # 3. RequirementsAnalyst.execute() with mocked LLM
 # ===========================================================================
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestExecute:
     """End-to-end execute() tests with no real API calls."""
 

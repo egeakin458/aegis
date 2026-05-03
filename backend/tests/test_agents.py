@@ -221,6 +221,7 @@ class TestSolutionArchitectInit:
         assert "Solution Architect" in agent.system_prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestSolutionArchitectBuildUserPrompt:
     """build_user_prompt() — normal and revision modes."""
 
@@ -318,6 +319,7 @@ class TestSolutionArchitectBuildUserPrompt:
         assert "DESIGN REVISION REQUESTED" not in prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestSolutionArchitectExecute:
     """execute() with mocked LLM — happy path, retry, double failure."""
 
@@ -481,6 +483,7 @@ class TestSolutionArchitectExecute:
         assert self.mock_client.messages.create.call_count == 2
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestSolutionArchitectEventEmission:
     """Verifies AGENT_START and AGENT_COMPLETE events for SA."""
 
@@ -723,6 +726,7 @@ class TestDeveloperInit:
         assert "Developer" in agent.system_prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestDeveloperBuildUserPrompt:
     """build_user_prompt() — normal and revision modes."""
 
@@ -864,6 +868,7 @@ class TestDeveloperBuildUserPrompt:
         assert "CodePatch" in prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestDeveloperExecute:
     """execute() with mocked LLM — happy path, retry, double failure."""
 
@@ -1040,6 +1045,7 @@ class TestDeveloperExecute:
         assert isinstance(result, CodeOutput)
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestDeveloperEventEmission:
     """Verifies AGENT_START and AGENT_COMPLETE events for Developer."""
 
@@ -1225,6 +1231,7 @@ class TestQAReviewerInit:
         assert "QA Reviewer" in agent.system_prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestQAReviewerBuildUserPrompt:
     """build_user_prompt() — single mode (QA Reviewer has no revision branch)."""
 
@@ -1323,6 +1330,7 @@ class TestQAReviewerBuildUserPrompt:
         assert "/api/menu" in prompt
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestQAReviewerExecute:
     """execute() with mocked LLM — all three verdicts, retry, double failure."""
 
@@ -1592,6 +1600,7 @@ class TestQAReviewerExecute:
         assert result.issues == []
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestQAReviewerEventEmission:
     """Verifies AGENT_START and AGENT_COMPLETE events for QA Reviewer."""
 
@@ -1851,6 +1860,7 @@ class TestQAReviewerEventEmission:
 # ===========================================================================
 
 
+@pytest.mark.usefixtures("use_legacy_mode")
 class TestBaseAgentLLMRetry:
     """
     _call_llm retries on RateLimitError, APITimeoutError, and 5xx APIStatusError.

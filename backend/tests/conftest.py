@@ -194,3 +194,10 @@ def mock_anthropic(monkeypatch) -> MagicMock:
 def make_mock_response():
     """Expose the helper so individual tests can build mock responses."""
     return _make_mock_response
+
+
+@pytest.fixture
+def use_legacy_mode(monkeypatch):
+    """Force use_ddc=False so legacy-path tests keep working after C14 flag flip."""
+    from app.config import settings as _settings
+    monkeypatch.setattr(_settings, "use_ddc", False)
