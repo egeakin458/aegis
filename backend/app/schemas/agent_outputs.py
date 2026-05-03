@@ -63,6 +63,7 @@ class APIEndpoint(BaseModel):
     description: str
     request_body: Optional[str] = Field(None, description="Expected request body description")
     response: str = Field(..., description="Expected response description")
+    feature_id: Optional[str] = Field(None, description="use_case.id this endpoint implements (DDC mode)")
 
 
 class UIComponent(BaseModel):
