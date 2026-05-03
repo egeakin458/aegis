@@ -23,6 +23,62 @@ Senior thesis project — Izmir University of Economics, Computer Engineering.
 
 Tagged: `v0.2.0-pipeline-refactor`
 
+## DDC v1 — Domain-Driven Configuration (in progress on `feat/ddc-v1`)
+
+Replaces the conversational `CustomerConfig` with a strict 4D contract: **Actor / DomainEntity / UseCase / BusinessRule** + Relationships. A Pydantic `model_validator` enforces referential integrity at parse time. `use_case.id` becomes the new `feature_id` (preserves Phase-2 threading). Full plan: `docs/Domain_Driven_Configuration_Plan.md`.
+
+### DDC v1 Schema (`CustomerConfigV2`)
+
+```
+schema_version: "ddc-v1"          # literal discriminator
+context:
+  name: str                        # kebab-case project slug
+  domain_description: str          # min 50, max 1500 chars
+  industry: retail|healthcare|education|finance|services|other
+  visual_style: clean_minimal|bold_modern|warm_friendly|professional_corporate|playful
+  mobile_first: bool
+actors[]:        id (act_XXXXXXXX), role_name, auth_method, permissions_description
+entities[]:      id (ent_XXXXXXXX), name, attributes[], states[], owned_by_actor_id?
+relationships[]: id (rel_XXXXXXXX), from_entity_id, to_entity_id, kind, name
+business_rules[]:id (rule_XXXXXX), description, trigger_condition, enforcement_action
+use_cases[]:     id (uc_XXXXXXXX), name, type (command|query), actor_id,
+                 primary_entity_id, business_rule_ids[], description?
+```
+
+**Referential integrity** enforced by `model_validator(mode="after")` on `CustomerConfigV2`:
+actor IDs, entity IDs, and rule IDs referenced by other objects must exist in their respective lists.
+
+### DDC v1 Feature Flag
+
+`settings.use_ddc: bool = False` (`.env: USE_DDC=true`). Gating:
+- **Runner**: `self._use_ddc` at init; all handlers branch on it. DDC stores `customer_config_v2` in context; legacy stores `finalized_config`.
+- **API** `/start`: parses `dict` body, discriminates on `schema_version == "ddc-v1"`.
+- **C14**: flag flipped to `True` by default. **C15**: legacy deleted.
+
+### Intake Modes (Frontend)
+
+Three-way toggle in `IntakeModal`: **Classic** (legacy 7-section form) | **Quick** (free-text DDC) | **Advanced** (structured DDC builder). Mode persisted in `localStorage` under key `aegis_intake_mode`.
+
+**Quick (free-text)** — `FreeTextSection` → `mapFreeTextToDDC()` → minimal DDC with one placeholder Actor/Entity/UseCase. RA expands it.
+
+**Advanced (structured)** — 5 sections using `useFieldArray`:
+1. Actors — role_name, auth_method, permissions_description
+2. Entities — name, attributes (nested field array), states, owned_by_actor_id
+3. Relationships — from/to entity selects, kind, name
+4. Business Rules — description, trigger_condition, enforcement_action
+5. Use Cases — name, type, actor_id select, primary_entity_id select, business_rule_ids checkboxes
+
+**Key files**:
+- `frontend/lib/schemas/ddc.ts` — Zod v4 mirror of `CustomerConfigV2`
+- `frontend/lib/schemas/intake-form.ts` — `freeTextFormSchema` + `FreeTextFormValues`
+- `frontend/lib/mappers/free-text.ts` — `mapFreeTextToDDC()`
+- `frontend/lib/mappers/config.ts` — `mapFormToDDC()` (delegates); `mapFormToCustomerConfig()` preserved until C15
+- `frontend/components/intake-modal/sections/` — `free-text.tsx`, `actors.tsx`, `entities.tsx`, `relationships.tsx`, `rules.tsx`, `use-cases.tsx`
+
+### Jest test environment note
+
+All frontend tests run in **node** environment. `import type` syntax causes Babel parse errors in test files — use regular `import` instead. Use `npm test` (not `npx jest`) to pick up the local jest version.
+
 ---
 
 ## Development Commands
@@ -90,7 +146,7 @@ All under prefix `/api/pipeline`:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/start` | Submit `CustomerConfig`, returns `run_id` |
+| POST | `/start` | Submit `CustomerConfig` or `CustomerConfigV2` (DDC), returns `run_id` |
 | GET | `/{run_id}/events` | SSE stream — replays existing events, then live stream |
 | POST | `/{run_id}/clarification` | Submit answers to resume paused pipeline |
 | GET | `/{run_id}/status` | Current state, tokens, feedback cycles |
@@ -145,7 +201,7 @@ The frontend (`frontend/`) is a Next.js 14 App Router app that consumes the back
 
 ### Key Data Flows
 
-**Form → Backend**: `IntakeModal` (7 sections, react-hook-form + zod) → `lib/mappers/config.ts:mapFormToCustomerConfig()` → `POST /api/pipeline/start` → `run_id`. All enum conversions happen in the mapper (display strings like `"Clean & Minimal"` → backend values like `"clean_minimal"`).
+**Form → Backend**: `IntakeModal` (three-way mode toggle: Classic/Quick/Advanced) → mapper → `POST /api/pipeline/start` → `run_id`. Classic uses `mapFormToCustomerConfig()`; Quick and Advanced use `mapFormToDDC()` / direct structured DDC. DDC payloads carry `schema_version: "ddc-v1"` and are discriminated at the API layer.
 
 **SSE → UI state**: `lib/api/sse.ts` wraps `@microsoft/fetch-event-source` (not native `EventSource` — needed for proper connection lifecycle). `lib/hooks/use-pipeline.ts` runs a `useReducer` that dedupes events by `event_id`, maps each `EventType` to a `ConsoleEntry`, and derives `OrbitPhase` from the stream. URL param `?run={id}` enables refresh-safe replay — on mount the hook opens SSE against the existing run; the backend replays all stored events; the reducer dedupes.
 
@@ -168,15 +224,17 @@ frontend/
       center-panel.tsx        foreignObject + AnimatePresence crossfade on phase change
     console/entries/          10 entry-type components (agent-start → summary)
     intake-modal/
-      sections/               7 form sections
+      sections/               Classic: 7 legacy sections; DDC: free-text.tsx, actors.tsx, entities.tsx, relationships.tsx, rules.tsx, use-cases.tsx
       widgets/                SegmentedToggle, MultiSelectChips, TagInput, ColorPicker, FeatureList
     top-bar/                  StatusPill, StatusStrip
     output-viewer/            (Phase 5) file tree + content drawer
     ui/                       shadcn-generated primitives
   lib/
     types/ui.ts               OrbitPhase, ConsoleEntry union, PipelineState
-    schemas/intake-form.ts    zod schema + IntakeFormValues type + defaults
-    mappers/config.ts         mapFormToCustomerConfig() — all enum round-trips
+    schemas/intake-form.ts    IntakeFormValues (legacy) + FreeTextFormValues (DDC quick mode)
+    schemas/ddc.ts            Zod v4 mirror of CustomerConfigV2 with all 8 sub-schemas
+    mappers/config.ts         mapFormToDDC() (DDC) + mapFormToCustomerConfig() (legacy, until C15)
+    mappers/free-text.ts      mapFreeTextToDDC() — builds minimal DDC from free-text form
     mappers/events.ts         (Phase 3) PipelineEvent → ConsoleEntry
     mappers/phase.ts          (Phase 3) event stream → OrbitPhase
     api/client.ts             (Phase 3) typed fetch wrappers
@@ -195,14 +253,6 @@ The orbit is the **primary hero element**. Key design decisions:
 - **Arcs**: base stroke `#1e3a4a` at 2px; active arc `#22d3ee` fully opaque at 2.5px; emerald trail (`#10b981`, opacity 0.35) on completed segments; comet `r=5` with ghost tail `r=3 delay=0.15s`
 - **Idle rotation**: `OrbitArcs` wraps arcs in `motion.g` that does a 60s 360° rotation when `activeSegment === null`, stops when pipeline runs
 - **Center panel**: 65px frosted containment circle + `<foreignObject>` with `AnimatePresence` crossfade (0.25s) on every phase transition; subtitle 11px `#94a3b8`
-
-### Intake Form — Pending Refactor
-
-The current form (7 sections, `components/intake-modal/sections/`) has ~8 zod fields that don't exist in `CustomerConfig` and several structural mismatches with the research doc spec (`docs/Aegis_Research_Decisions_Plan.md` §4.4). Work needed:
-
-- **Schema** (`lib/schemas/intake-form.ts`): remove orphaned fields, add `description`, `entities`, `has_existing_data`, `auth_required`, `user_roles`; consolidate split fields
-- **Mapper** (`lib/mappers/config.ts`): remove workaround concatenations once schema is clean
-- **Sections**: industry → Select dropdown; problem → single textarea; features → single priority list; data → TagInput + toggle; technical → add auth toggle + userRoles; timeline → remove projectName/budgetRange
 
 ### Design Tokens
 
