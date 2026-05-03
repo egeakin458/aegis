@@ -38,50 +38,49 @@ def client():
         yield c
 
 
-@pytest.fixture
-def valid_config_payload():
-    return {
-        "business_context": {
-            "name": "Test Co",
-            "industry": "other",
-            "description": "A test company.",
-            "size": "1-5",
-        },
-        "problem_statement": {
-            "problem": "Need a website.",
-            "users": ["owner"],
-        },
-        "features": {
-            "requested": [{"description": "Landing page", "priority": 1}]
-        },
-        "data": {"entities": []},
-    }
-
-
 # ============================================================
 # POST /api/pipeline/start
 # ============================================================
 
 class TestStartPipeline:
-    def test_start_returns_201_with_run_id(self, client, valid_config_payload):
+    def test_start_returns_201_with_run_id(self, client, ddc_ecommerce):
+        """POST /start with a valid DDC payload returns 201 + run_id."""
         with patch("app.api.routes.runner_manager") as mock_manager:
             mock_manager.start_run = AsyncMock(return_value="run-abc-123")
 
-            response = client.post("/api/pipeline/start", json=valid_config_payload)
+            response = client.post(
+                "/api/pipeline/start",
+                json=ddc_ecommerce.model_dump(mode="json"),
+            )
 
             assert response.status_code == 201
             data = response.json()
             assert data["run_id"] == "run-abc-123"
             assert data["status"] == "started"
 
-    def test_start_with_invalid_config_returns_422(self, client):
+    def test_start_without_ddc_schema_version_returns_400(self, client):
+        """A payload missing schema_version=ddc-v1 must be rejected with 400."""
         response = client.post("/api/pipeline/start", json={"bad": "data"})
+        assert response.status_code == 400
+
+    def test_start_with_invalid_ddc_payload_returns_422(self, client):
+        """An invalid DDC payload (schema_version set but content wrong) → 422."""
+        response = client.post(
+            "/api/pipeline/start",
+            json={"schema_version": "ddc-v1", "bad": "data"},
+        )
         assert response.status_code == 422
 
-    def test_start_with_empty_features_returns_422(self, client, valid_config_payload):
-        valid_config_payload["features"]["requested"] = []
-        response = client.post("/api/pipeline/start", json=valid_config_payload)
-        assert response.status_code == 422
+    def test_start_accepts_ddc_payload(self, client, ddc_ecommerce):
+        """POST /start must accept a valid CustomerConfigV2 payload."""
+        with patch("app.api.routes.runner_manager") as mock_manager:
+            mock_manager.start_run = AsyncMock(return_value="run-ddc-001")
+            payload = ddc_ecommerce.model_dump(mode="json")
+            response = client.post("/api/pipeline/start", json=payload)
+            assert response.status_code == 201
+            data = response.json()
+            assert data["run_id"] == "run-ddc-001"
+            assert data["status"] == "started"
 
 
 # ============================================================

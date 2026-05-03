@@ -1,175 +1,111 @@
 """
-Customer configuration schemas.
+Domain-Driven Configuration (DDC) v1 schema.
 
-Defines the structure of the raw config produced by the intake form
-and the finalized config produced by the Requirements Analyst.
+Strict 4-dimensional contract (Who / What / Why+How) that is directly
+machine-actionable by all pipeline agents.
 """
 
-from __future__ import annotations
-
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing import List, Literal, Optional
+import uuid
 
 
-# --- Enums for constrained fields ---
+# --- Enums ---
 
-class IndustryType(str, Enum):
-    RETAIL = "retail"
-    FOOD_AND_BEVERAGE = "food_and_beverage"
-    PROFESSIONAL_SERVICES = "professional_services"
-    HEALTHCARE = "healthcare"
-    EDUCATION = "education"
-    MANUFACTURING = "manufacturing"
-    OTHER = "other"
+AuthMethod = Literal["anonymous", "email_password", "invite_only", "sso"]
+UseCaseType = Literal["command", "query"]
+DataFieldType = Literal["string", "text", "integer", "decimal", "boolean", "datetime", "date", "uuid", "json"]
+RelationshipKind = Literal["one_to_one", "one_to_many", "many_to_many"]
+Industry = Literal["retail", "healthcare", "education", "finance", "services", "other"]
+VisualStyle = Literal["clean_minimal", "bold_modern", "warm_friendly", "professional_corporate", "playful"]
 
 
-class BusinessSize(str, Enum):
-    SOLO = "1-5"
-    SMALL = "6-20"
-    MEDIUM = "21-50"
-    LARGE = "50+"
+# --- Atoms ---
+
+class Attribute(BaseModel):
+    """A typed property of a DomainEntity. Reuses Phase-3 typed schemas."""
+    name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$",
+                      description="snake_case attribute name. Becomes a SQL column.")
+    type: DataFieldType = Field(..., description="Maps directly to a SQLite column type.")
+    required: bool = Field(default=True)
+    unique: bool = Field(default=False)
+    description: Optional[str] = Field(None, max_length=200,
+                                       description="Optional human note for the SA's UI rendering.")
 
 
-class UserType(str, Enum):
-    OWNER = "owner"
-    EMPLOYEES = "employees"
-    CUSTOMERS = "customers"
-    ALL = "all"
+class Relationship(BaseModel):
+    """Entity-to-entity relationship. Drives FK creation by the SA."""
+    id: str = Field(default_factory=lambda: f"rel_{uuid.uuid4().hex[:8]}")
+    from_entity_id: str = Field(..., description="References DomainEntity.id (the owning side).")
+    to_entity_id: str = Field(..., description="References DomainEntity.id (the related side).")
+    kind: RelationshipKind
+    name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$",
+                      description="snake_case role name, e.g. 'order_items', 'author'.")
 
 
-class AccessScope(str, Enum):
-    PERSONAL = "just_me"
-    TEAM = "team_network"
-    PUBLIC = "anyone_internet"
+# --- Core Dimensions ---
+
+class ProjectContext(BaseModel):
+    name: str = Field(..., min_length=2, max_length=60,
+                      description="Kebab-case basis for project naming.")
+    domain_description: str = Field(..., min_length=50, max_length=1500,
+                                    description="Core business value. SA infers tone and UX from this.")
+    industry: Industry
+    visual_style: VisualStyle = Field(default="clean_minimal",
+                                      description="Tailwind theme hint for the Developer agent.")
+    mobile_first: bool = Field(default=True)
 
 
-class DesignStyle(str, Enum):
-    MINIMAL = "clean_minimal"
-    CORPORATE = "professional_corporate"
-    COLORFUL = "modern_colorful"
-    NO_PREFERENCE = "no_preference"
+class Actor(BaseModel):
+    """The 'WHO'. RBAC subject."""
+    id: str = Field(default_factory=lambda: f"act_{uuid.uuid4().hex[:8]}")
+    role_name: str = Field(..., pattern=r"^[A-Z][a-zA-Z0-9]*$",
+                           description="PascalCase role, e.g. 'SystemAdmin', 'Customer'.")
+    auth_method: AuthMethod
+    permissions_description: str = Field(..., min_length=10, max_length=500,
+                                         description="Free-text capability summary; QA reads this.")
 
 
-class MobileSupport(str, Enum):
-    YES = "yes"
-    NO = "no"
-    NICE_TO_HAVE = "nice_to_have"
+class DomainEntity(BaseModel):
+    """The 'WHAT'. Source of truth for DDL generation."""
+    id: str = Field(default_factory=lambda: f"ent_{uuid.uuid4().hex[:8]}")
+    name: str = Field(..., pattern=r"^[A-Z][a-zA-Z0-9]*$",
+                      description="Singular PascalCase, e.g. 'Invoice', 'PatientRecord'.")
+    attributes: List[Attribute] = Field(..., min_length=1)
+    states: List[str] = Field(default_factory=lambda: ["Active"], min_length=1,
+                              description="Lifecycle states; mapped to a CHECK constraint.")
+    owned_by_actor_id: Optional[str] = Field(None,
+                                             description="References Actor.id. Implies an FK to that actor.")
 
 
-class DataVolume(str, Enum):
-    UNDER_100 = "under_100"
-    SMALL = "100-1000"
-    MEDIUM = "1000-10000"
-    LARGE = "10000+"
+class BusinessRule(BaseModel):
+    """The 'WHY/HOW'. Top-level so it can be referenced by many UseCases."""
+    id: str = Field(default_factory=lambda: f"rule_{uuid.uuid4().hex[:8]}")
+    description: str = Field(..., min_length=10, max_length=500,
+                             description="Human-readable; QA asserts against this.")
+    trigger_condition: str = Field(..., max_length=300,
+                                   description="e.g. 'When Order.state == Pending'.")
+    enforcement_action: str = Field(..., max_length=300,
+                                    description="e.g. 'Reject mutation, return 400'.")
 
 
-# --- Form section models ---
-
-class BusinessContext(BaseModel):
-    """Section 1: Business context information."""
-    name: str = Field(..., description="Business name")
-    industry: IndustryType = Field(..., description="Industry sector")
-    industry_other: Optional[str] = Field(None, description="Specify if industry is 'other'")
-    description: str = Field(..., description="Brief business description (2-3 sentences)")
-    size: BusinessSize = Field(..., description="Number of employees")
-
-
-class ProblemStatement(BaseModel):
-    """Section 2: What problem the software should solve."""
-    problem: str = Field(..., description="Description of the problem to solve")
-    users: list[UserType] = Field(..., min_length=1, description="Who will use this software")
-    current_process: Optional[str] = Field(None, description="How this is currently handled")
+class UseCase(BaseModel):
+    """The 'HOW'. Connects an Actor to an Entity through Rules."""
+    id: str = Field(default_factory=lambda: f"uc_{uuid.uuid4().hex[:8]}")
+    name: str = Field(..., min_length=3, max_length=80,
+                      description="Imperative verb phrase, e.g. 'Process Refund'.")
+    type: UseCaseType
+    actor_id: str = Field(..., description="References Actor.id.")
+    primary_entity_id: str = Field(..., description="References DomainEntity.id.")
+    business_rule_ids: List[str] = Field(default_factory=list,
+                                          description="References BusinessRule.id values.")
+    description: Optional[str] = Field(None, max_length=400,
+                                       description="Optional context for the SA.")
 
 
-class FeatureRequest(BaseModel):
-    """A single requested feature with priority."""
-    description: str = Field(..., description="Feature description")
-    priority: int = Field(..., ge=1, description="Priority rank (1 = highest)")
-    feature_id: str = Field("", description="Stable server-generated feature identifier (filled at POST /start)")
-
-
-class Features(BaseModel):
-    """Section 3: Core feature requests."""
-    requested: list[FeatureRequest] = Field(..., min_length=1, description="List of requested features")
-
-
-class FileUpload(BaseModel):
-    """Reference to an uploaded file."""
-    filename: str
-    category: str = Field(..., description="Upload category: existing_data | reference_spreadsheet | sample_document | branding_material | design_reference")
-    file_path: Optional[str] = Field(None, description="Server-side file path after upload")
-
-
-class Entity(BaseModel):
-    """A single data entity the application needs to store."""
-    name: str = Field(..., description="Entity name in singular PascalCase, e.g. 'Order', 'MenuItem'")
-    description: str = Field(..., description="What this entity represents and what attributes it has")
-    estimated_volume: Optional[str] = Field(None, description="Free-form estimate, e.g. 'a few hundred per month'")
-
-
-class DataRequirements(BaseModel):
-    """Section 4: Data and content requirements."""
-    entities: list[Entity] = Field(default_factory=list, description="Data entities the application needs to store")
-    has_existing_data: bool = Field(False, description="Whether existing data needs importing")
-    uploads: list[FileUpload] = Field(default_factory=list, description="Uploaded files")
-    volume: DataVolume = Field(DataVolume.UNDER_100, description="Estimated data volume")
-
-
-class DesignPreferences(BaseModel):
-    """Section 5: Design and branding preferences (all optional)."""
-    colors: Optional[list[str]] = Field(None, description="Brand colors (hex values)")
-    logo: Optional[FileUpload] = Field(None, description="Uploaded logo file")
-    references: list[FileUpload] = Field(default_factory=list, description="Design reference uploads")
-    style: DesignStyle = Field(DesignStyle.NO_PREFERENCE, description="Preferred visual style")
-
-
-class UserRole(BaseModel):
-    """A user role in the application."""
-    name: str = Field(..., description="Role name in snake_case, e.g. 'admin', 'staff', 'customer'")
-    description: str = Field(..., description="What this role can do")
-
-
-class TechnicalRequirements(BaseModel):
-    """Section 6: Technical requirements (constrained choices)."""
-    access_scope: AccessScope = Field(AccessScope.PUBLIC, description="Who needs access")
-    auth_required: bool = Field(True, description="Whether user login is needed")
-    user_roles: list[UserRole] = Field(default_factory=list, description="User roles when auth_required is true; empty list otherwise")
-    mobile: MobileSupport = Field(MobileSupport.NICE_TO_HAVE, description="Mobile support level")
-
-
-class ProjectMeta(BaseModel):
-    """Section 7: Timeline and additional info."""
-    deadline: Optional[datetime] = Field(None, description="Hard deadline if any")
-    notes: Optional[str] = Field(None, description="Additional notes")
-    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-# --- Top-level config models ---
-
-class CustomerConfig(BaseModel):
-    """
-    Raw customer configuration produced by the intake form.
-    This is the input to the Requirements Analyst agent.
-    """
-    business_context: BusinessContext
-    problem_statement: ProblemStatement
-    features: Features
-    data: DataRequirements
-    design: DesignPreferences = Field(default_factory=DesignPreferences)
-    technical: TechnicalRequirements = Field(default_factory=TechnicalRequirements)
-    meta: ProjectMeta = Field(default_factory=ProjectMeta)
-
-
-class AssumedField(BaseModel):
-    """A field where the Requirements Analyst made an assumption."""
-    field_path: str = Field(..., description="Dot-path to the field, e.g. 'features.requested[0].description'")
-    original_value: Optional[str] = Field(None, description="What the customer originally provided")
-    assumed_value: str = Field(..., description="What the agent assumed")
-    reasoning: str = Field(..., description="Why this assumption was made")
-
+# --- Clarification round support ---
+# These types support the RA's clarification loop and are reused across
+# both the DDC RA output schema and the pipeline runner.
 
 class ClarificationQuestion(BaseModel):
     """A question the Requirements Analyst needs answered."""
@@ -187,14 +123,54 @@ class ClarificationRound(BaseModel):
     answers: Optional[dict[str, str]] = Field(None, description="Customer answers keyed by question id")
 
 
-class FinalizedConfig(BaseModel):
-    """
-    The finalized, unambiguous customer configuration.
-    Produced by the Requirements Analyst after the clarification loop.
-    This is the canonical reference for ALL downstream agents.
-    """
-    config: CustomerConfig = Field(..., description="The complete, validated config")
-    assumptions: list[AssumedField] = Field(default_factory=list, description="Any assumptions made")
-    clarification_history: list[ClarificationRound] = Field(default_factory=list)
-    project_summary: str = Field(..., description="Human-readable project brief for the customer")
-    is_complete: bool = Field(..., description="Whether the config is fully specified")
+# --- Root Payload ---
+
+SCHEMA_VERSION = "ddc-v1"
+
+
+class CustomerConfigV2(BaseModel):
+    schema_version: Literal["ddc-v1"] = Field(default="ddc-v1")
+    context: ProjectContext
+    actors: List[Actor] = Field(..., min_length=1)
+    entities: List[DomainEntity] = Field(..., min_length=1)
+    relationships: List[Relationship] = Field(default_factory=list)
+    business_rules: List[BusinessRule] = Field(default_factory=list)
+    use_cases: List[UseCase] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def validate_referential_integrity(self) -> "CustomerConfigV2":
+        actor_ids = {a.id for a in self.actors}
+        entity_ids = {e.id for e in self.entities}
+        rule_ids = {r.id for r in self.business_rules}
+
+        # Uniqueness
+        if len({a.role_name for a in self.actors}) != len(self.actors):
+            raise ValueError("Actor role_names must be unique.")
+        if len({e.name for e in self.entities}) != len(self.entities):
+            raise ValueError("Entity names must be unique.")
+
+        # Entity ownership
+        for ent in self.entities:
+            if ent.owned_by_actor_id and ent.owned_by_actor_id not in actor_ids:
+                raise ValueError(f"Entity {ent.name} owned_by unknown Actor: {ent.owned_by_actor_id}")
+            if len({a.name for a in ent.attributes}) != len(ent.attributes):
+                raise ValueError(f"Entity {ent.name} has duplicate attribute names.")
+
+        # Relationships
+        for rel in self.relationships:
+            if rel.from_entity_id not in entity_ids:
+                raise ValueError(f"Relationship {rel.name}: unknown from_entity_id {rel.from_entity_id}")
+            if rel.to_entity_id not in entity_ids:
+                raise ValueError(f"Relationship {rel.name}: unknown to_entity_id {rel.to_entity_id}")
+
+        # Use cases
+        for uc in self.use_cases:
+            if uc.actor_id not in actor_ids:
+                raise ValueError(f"UseCase {uc.name}: unknown actor_id {uc.actor_id}")
+            if uc.primary_entity_id not in entity_ids:
+                raise ValueError(f"UseCase {uc.name}: unknown primary_entity_id {uc.primary_entity_id}")
+            for rid in uc.business_rule_ids:
+                if rid not in rule_ids:
+                    raise ValueError(f"UseCase {uc.name}: unknown business_rule_id {rid}")
+
+        return self

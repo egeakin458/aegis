@@ -6,27 +6,17 @@ Import from this package for clean access to all schemas.
 """
 
 from .customer_config import (
-    AccessScope,
-    AssumedField,
-    BusinessContext,
-    BusinessSize,
+    Actor,
+    Attribute,
+    BusinessRule,
     ClarificationQuestion,
     ClarificationRound,
-    CustomerConfig,
-    DataRequirements,
-    DataVolume,
-    DesignPreferences,
-    DesignStyle,
-    FeatureRequest,
-    Features,
-    FileUpload,
-    FinalizedConfig,
-    IndustryType,
-    MobileSupport,
-    ProblemStatement,
-    ProjectMeta,
-    TechnicalRequirements,
-    UserType,
+    CustomerConfigV2,
+    DomainEntity,
+    ProjectContext,
+    Relationship,
+    UseCase,
+    SCHEMA_VERSION as DDC_SCHEMA_VERSION,
 )
 from .agent_outputs import (
     APIEndpoint,
@@ -51,7 +41,7 @@ from .pipeline_events import (
     TokenUsage,
 )
 from .ra_output import (
-    RAOutput,
+    RAOutputDDC,
 )
 from .evaluation import (
     BenchmarkTask,
@@ -62,29 +52,6 @@ from .evaluation import (
 )
 
 __all__ = [
-    # Customer config
-    "CustomerConfig",
-    "FinalizedConfig",
-    "BusinessContext",
-    "ProblemStatement",
-    "Features",
-    "FeatureRequest",
-    "DataRequirements",
-    "DesignPreferences",
-    "TechnicalRequirements",
-    "ProjectMeta",
-    "FileUpload",
-    "ClarificationQuestion",
-    "ClarificationRound",
-    "AssumedField",
-    # Customer config enums
-    "IndustryType",
-    "BusinessSize",
-    "UserType",
-    "AccessScope",
-    "DesignStyle",
-    "MobileSupport",
-    "DataVolume",
     # Agent outputs
     "TechnicalDesign",
     "DataModel",
@@ -98,8 +65,20 @@ __all__ = [
     "ReviewIssue",
     "ReviewVerdict",
     "IssueSeverity",
+    # DDC v1 schema
+    "CustomerConfigV2",
+    "ProjectContext",
+    "Actor",
+    "DomainEntity",
+    "Attribute",
+    "Relationship",
+    "BusinessRule",
+    "UseCase",
+    "ClarificationQuestion",
+    "ClarificationRound",
+    "DDC_SCHEMA_VERSION",
     # RA output wrapper
-    "RAOutput",
+    "RAOutputDDC",
     # Pipeline events
     "PipelineEvent",
     "PipelineRun",

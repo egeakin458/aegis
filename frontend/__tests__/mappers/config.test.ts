@@ -1,120 +1,126 @@
-import { mapFormToCustomerConfig } from '@/lib/mappers/config'
-import { intakeFormDefaults } from '@/lib/schemas/intake-form'
+import { mapFormToDDC } from '@/lib/mappers/config'
+import { CustomerConfigV2Schema } from '@/lib/schemas/ddc'
+import { freeTextFormDefaults } from '@/lib/schemas/intake-form'
+
+// Long-enough domain description to satisfy the 50-char minimum
+const LONG_DESC =
+  'An online retail store where customers browse products and place orders.'
 
 const BASE = {
-  ...intakeFormDefaults,
-  companyName: 'Acme',
-  currentSituation: 'We do everything manually',
-  desiredOutcome: 'We want automation',
-  mustHaveFeatures: [{ id: '1', name: 'Dashboard', description: '', priority: 1 }],
-  projectName: 'AcmeApp',
+  ...freeTextFormDefaults,
+  projectName: 'acme-shop',
+  domainDescription: LONG_DESC,
 }
 
-describe('mapFormToCustomerConfig — enum round-trips', () => {
+describe('mapFormToDDC — output validates as CustomerConfigV2', () => {
+  test('valid input produces a passing CustomerConfigV2', () => {
+    const result = CustomerConfigV2Schema.safeParse(mapFormToDDC(BASE))
+    expect(result.success).toBe(true)
+  })
+
+  test('schema_version is always ddc-v1', () => {
+    expect(mapFormToDDC(BASE).schema_version).toBe('ddc-v1')
+  })
+})
+
+describe('mapFormToDDC — industry pass-through (no transformation)', () => {
   test.each([
-    ['1–5', '1-5'],
-    ['6–20', '6-20'],
-    ['21–50', '21-50'],
-    ['50+', '50+'],
-  ])('businessSize %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, businessSize: input as never })
-    expect(result.business_context.size).toBe(expected)
+    'retail',
+    'healthcare',
+    'education',
+    'finance',
+    'services',
+    'other',
+  ] as const)('industry %s passes through unchanged', (industry) => {
+    const ddc = mapFormToDDC({ ...BASE, industry })
+    expect(ddc.context.industry).toBe(industry)
   })
+})
 
+describe('mapFormToDDC — visual style pass-through', () => {
   test.each([
-    ['Retail', 'retail'],
-    ['Food & Beverage', 'food_and_beverage'],
-    ['Professional Services', 'professional_services'],
-    ['Healthcare', 'healthcare'],
-    ['Education', 'education'],
-    ['Manufacturing', 'manufacturing'],
-    ['Other', 'other'],
-  ])('industry %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, industry: input as never })
-    expect(result.business_context.industry).toBe(expected)
+    'clean_minimal',
+    'bold_modern',
+    'warm_friendly',
+    'professional_corporate',
+    'playful',
+  ] as const)('visual_style %s passes through unchanged', (visualStyle) => {
+    const ddc = mapFormToDDC({ ...BASE, visualStyle })
+    expect(ddc.context.visual_style).toBe(visualStyle)
   })
+})
 
+describe('mapFormToDDC — project name conversion', () => {
   test.each([
-    [['Owner'], ['owner']],
-    [['Employees'], ['employees']],
-    [['Customers'], ['customers']],
-    [['All Users'], ['all']],
-    [['Owner', 'Customers'], ['owner', 'customers']],
-  ])('targetUsers %j → %j', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, targetUsers: input as never })
-    expect(result.problem_statement.users).toEqual(expected)
+    ['shopflow', 'shopflow'],
+    ['My Shop', 'my-shop'],
+    ['Acme Inc.', 'acme-inc'],
+    ['task manager', 'task-manager'],
+  ])('projectName %s → context.name %s', (projectName, expected) => {
+    const ddc = mapFormToDDC({ ...BASE, projectName })
+    expect(ddc.context.name).toBe(expected)
+  })
+})
+
+describe('mapFormToDDC — mobile_first boolean', () => {
+  test('mobileFirst true → context.mobile_first true', () => {
+    const ddc = mapFormToDDC({ ...BASE, mobileFirst: true })
+    expect(ddc.context.mobile_first).toBe(true)
   })
 
-  test.each([
-    ['Under 100', 'under_100'],
-    ['100–1,000', '100-1000'],
-    ['1,000–10,000', '1000-10000'],
-    ['10,000+', '10000+'],
-  ])('dataVolume %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, dataVolume: input as never })
-    expect(result.data.volume).toBe(expected)
+  test('mobileFirst false → context.mobile_first false', () => {
+    const ddc = mapFormToDDC({ ...BASE, mobileFirst: false })
+    expect(ddc.context.mobile_first).toBe(false)
+  })
+})
+
+describe('mapFormToDDC — domain description', () => {
+  test('domain description is passed through unchanged', () => {
+    const ddc = mapFormToDDC({ ...BASE, domainDescription: LONG_DESC })
+    expect(ddc.context.domain_description).toBe(LONG_DESC)
+  })
+})
+
+describe('mapFormToDDC — placeholder DDC structure', () => {
+  test('produces exactly one placeholder actor', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.actors).toHaveLength(1)
   })
 
-  test.each([
-    ['Clean & Minimal', 'clean_minimal'],
-    ['Professional & Corporate', 'professional_corporate'],
-    ['Modern & Colorful', 'modern_colorful'],
-    ['No Preference', 'no_preference'],
-  ])('visualStyle %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, visualStyle: input as never })
-    expect(result.design.style).toBe(expected)
+  test('produces exactly one placeholder entity', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.entities).toHaveLength(1)
   })
 
-  test.each([
-    ['Yes', 'yes'],
-    ['No', 'no'],
-    ['Nice to Have', 'nice_to_have'],
-  ])('mobileSupport %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, mobileSupport: input as never })
-    expect(result.technical.mobile).toBe(expected)
+  test('produces exactly one placeholder use case', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.use_cases).toHaveLength(1)
   })
 
-  test.each([
-    ['Just Me', 'just_me'],
-    ['Team / Network', 'team_network'],
-    ['Anyone on the Internet', 'anyone_internet'],
-  ])('accessScope %s → %s', (input, expected) => {
-    const result = mapFormToCustomerConfig({ ...BASE, accessScope: input as never })
-    expect(result.technical.access_scope).toBe(expected)
+  test('placeholder actor uses anonymous auth', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.actors[0].auth_method).toBe('anonymous')
   })
 
-  test('deadline ISO conversion', () => {
-    const result = mapFormToCustomerConfig({ ...BASE, deadline: '2026-06-01' })
-    expect(result.meta.deadline).toMatch(/^2026-06-01T/)
+  test('placeholder use case actor_id matches placeholder actor', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.use_cases[0].actor_id).toBe(ddc.actors[0].id)
   })
 
-  test('null deadline stays null', () => {
-    const result = mapFormToCustomerConfig({ ...BASE, deadline: null })
-    expect(result.meta.deadline).toBeNull()
+  test('placeholder use case primary_entity_id matches placeholder entity', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc.use_cases[0].primary_entity_id).toBe(ddc.entities[0].id)
   })
 
-  test('uploads always empty array', () => {
-    const result = mapFormToCustomerConfig(BASE)
-    expect(result.data.uploads).toEqual([])
+  test('no hardcoded auth_required field in output', () => {
+    const ddc = mapFormToDDC(BASE)
+    expect(ddc).not.toHaveProperty('auth_required')
   })
 
-  test('mustHaveFeatures mapped to features.requested', () => {
-    const result = mapFormToCustomerConfig({
-      ...BASE,
-      mustHaveFeatures: [{ id: '1', name: 'Login', description: 'User login', priority: 1 }],
-    })
-    expect(result.features.requested[0].description).toContain('Login')
-    expect(result.features.requested[0].priority).toBe(1)
-  })
-
-  test('niceToHaveFeatures appended after mustHave with higher priority', () => {
-    const result = mapFormToCustomerConfig({
-      ...BASE,
-      mustHaveFeatures: [{ id: '1', name: 'Login', description: '', priority: 1 }],
-      niceToHaveFeatures: ['Dark mode'],
-    })
-    expect(result.features.requested).toHaveLength(2)
-    expect(result.features.requested[1].description).toBe('Dark mode')
-    expect(result.features.requested[1].priority).toBeGreaterThan(result.features.requested[0].priority)
+  test('no string concatenation artifacts in description', () => {
+    const ddc = mapFormToDDC(BASE)
+    const actorDesc = ddc.actors[0].permissions_description
+    expect(actorDesc).not.toContain('undefined')
+    expect(actorDesc).not.toContain('null')
   })
 })

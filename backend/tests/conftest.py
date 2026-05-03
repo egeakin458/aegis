@@ -10,99 +10,23 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.schemas.customer_config import (
-    BusinessContext,
-    BusinessSize,
-    CustomerConfig,
-    DataRequirements,
-    FeatureRequest,
-    Features,
-    FinalizedConfig,
-    IndustryType,
-    ProblemStatement,
-    UserType,
-    AssumedField,
-    ClarificationQuestion,
-    ClarificationRound,
-)
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import PipelineEvent, TokenUsage
 
+import pathlib
+
+_FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
+
 
 # ---------------------------------------------------------------------------
-# Customer config fixtures
+# DDC v1 fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def valid_customer_config() -> CustomerConfig:
-    """Minimal valid CustomerConfig that passes all schema validation."""
-    return CustomerConfig(
-        business_context=BusinessContext(
-            name="Cafe Latte",
-            industry=IndustryType.FOOD_AND_BEVERAGE,
-            description="A small coffee shop chain with 3 locations.",
-            size=BusinessSize.SMALL,
-        ),
-        problem_statement=ProblemStatement(
-            problem="We need an online ordering system for pickup orders.",
-            users=[UserType.CUSTOMERS, UserType.EMPLOYEES],
-            current_process="Phone calls and walk-ins only.",
-        ),
-        features=Features(
-            requested=[
-                FeatureRequest(description="Menu display with categories", priority=1, feature_id="feat_menu-display-with-categories_a1b2c3"),
-                FeatureRequest(description="Shopping cart and checkout", priority=2, feature_id="feat_shopping-cart-and-checkout_d4e5f6"),
-            ]
-        ),
-        data=DataRequirements(entities=[
-            {"name": "MenuItem", "description": "A single item on the cafe menu", "estimated_volume": None},
-            {"name": "Order", "description": "A customer order", "estimated_volume": None},
-            {"name": "Customer", "description": "A registered customer", "estimated_volume": None},
-        ]),
-    )
-
-
-@pytest.fixture
-def valid_finalized_config(valid_customer_config: CustomerConfig) -> FinalizedConfig:
-    """Minimal valid FinalizedConfig wrapping the base customer config."""
-    return FinalizedConfig(
-        config=valid_customer_config,
-        assumptions=[
-            AssumedField(
-                field_path="technical.auth_required",
-                original_value=None,
-                assumed_value="true",
-                reasoning="Customers need accounts to track orders.",
-            ),
-        ],
-        project_summary=(
-            "An online ordering system for Cafe Latte, a 3-location coffee shop. "
-            "Customers can browse the menu and place pickup orders. "
-            "Staff can manage incoming orders in real time."
-        ),
-        is_complete=True,
-    )
-
-
-@pytest.fixture
-def sample_clarification_question() -> ClarificationQuestion:
-    return ClarificationQuestion(
-        id="q1",
-        topic="authentication",
-        original_input="Need an online ordering system",
-        question="Should customers be required to create an account before ordering?",
-        suggestions=["Yes, always", "No, allow guest checkout", "Optional"],
-    )
-
-
-@pytest.fixture
-def sample_clarification_round(
-    sample_clarification_question: ClarificationQuestion,
-) -> ClarificationRound:
-    return ClarificationRound(
-        round_number=1,
-        questions=[sample_clarification_question],
-        answers={"q1": "Yes, always"},
-    )
+def ddc_ecommerce() -> CustomerConfigV2:
+    """Complete valid DDC for a small e-commerce store. Canonical test fixture."""
+    raw = json.loads((_FIXTURES_DIR / "ddc_ecommerce.json").read_text())
+    return CustomerConfigV2.model_validate(raw)
 
 
 # ---------------------------------------------------------------------------

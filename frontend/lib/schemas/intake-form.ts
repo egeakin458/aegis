@@ -1,5 +1,25 @@
 import { z } from 'zod'
 
+// --- Free-text DDC intake form ---
+
+export const freeTextFormSchema = z.object({
+  projectName: z.string().min(2).max(60),
+  domainDescription: z.string().min(50).max(1500),
+  industry: z.enum(['retail', 'healthcare', 'education', 'finance', 'services', 'other']),
+  visualStyle: z.enum(['clean_minimal', 'bold_modern', 'warm_friendly', 'professional_corporate', 'playful']).default('clean_minimal'),
+  mobileFirst: z.boolean().default(true),
+})
+
+export type FreeTextFormValues = z.infer<typeof freeTextFormSchema>
+
+export const freeTextFormDefaults: FreeTextFormValues = {
+  projectName: '',
+  domainDescription: '',
+  industry: 'retail',
+  visualStyle: 'clean_minimal',
+  mobileFirst: true,
+}
+
 export const featureSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Feature name required'),

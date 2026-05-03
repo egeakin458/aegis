@@ -18,7 +18,7 @@ from app.agents import Developer, QAReviewer, RequirementsAnalyst, SolutionArchi
 from app.db import repositories as repo
 from app.pipeline.output_storage import save_output
 from app.pipeline.runner import PipelineRunner
-from app.schemas.customer_config import CustomerConfig
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import (
     AgentName,
     EventType,
@@ -40,7 +40,7 @@ class RunnerEntry:
     run_id: str
     task: Optional[asyncio.Task] = None
     event_queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=_EVENT_QUEUE_SIZE))
-    customer_config: Optional[CustomerConfig] = None
+    customer_config: Optional[CustomerConfigV2] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -105,7 +105,7 @@ class RunnerManager:
             except (OSError, ValueError) as e:
                 logger.error("Failed to save output for run %s: %s", entry.run_id, e)
 
-    async def start_run(self, config: CustomerConfig) -> str:
+    async def start_run(self, config: CustomerConfigV2) -> str:
         """
         Start a new pipeline run.
 
@@ -139,7 +139,7 @@ class RunnerManager:
         # Launch pipeline as background task
         async def _execute():
             try:
-                runner.context = {"customer_config": config}
+                runner.context = {"customer_config_v2": config}
                 runner.clarification_history = []
                 runner.code_revision_count = 0
                 runner.design_revision_count = 0
