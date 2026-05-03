@@ -1,0 +1,143 @@
+{
+  "schema_version": "ddc-v1",
+  "context": {
+    "name": "shopflow",
+    "domain_description": "An online retail store where customers can browse products, add them to a cart, and place orders. Admins manage the product catalog and monitor all orders through a dashboard.",
+    "industry": "retail",
+    "visual_style": "clean_minimal",
+    "mobile_first": true
+  },
+  "actors": [
+    {
+      "id": "act_cust0001",
+      "role_name": "Customer",
+      "auth_method": "email_password",
+      "permissions_description": "Can browse products, add items to cart, place orders, and view their own order history."
+    },
+    {
+      "id": "act_admin001",
+      "role_name": "Admin",
+      "auth_method": "email_password",
+      "permissions_description": "Can manage the product catalog (create, update, remove products), view all customer orders, and update order states."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ent_prod0001",
+      "name": "Product",
+      "attributes": [
+        { "name": "title",       "type": "string",  "required": true,  "unique": false },
+        { "name": "price",       "type": "decimal", "required": true,  "unique": false },
+        { "name": "stock",       "type": "integer", "required": true,  "unique": false },
+        { "name": "description", "type": "text",    "required": false, "unique": false },
+        { "name": "sku",         "type": "string",  "required": true,  "unique": true  }
+      ],
+      "states": ["Active", "OutOfStock", "Discontinued"],
+      "owned_by_actor_id": null
+    },
+    {
+      "id": "ent_order001",
+      "name": "Order",
+      "attributes": [
+        { "name": "total",      "type": "decimal",  "required": true,  "unique": false },
+        { "name": "state",      "type": "string",   "required": true,  "unique": false },
+        { "name": "created_at", "type": "datetime", "required": true,  "unique": false }
+      ],
+      "states": ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"],
+      "owned_by_actor_id": "act_cust0001"
+    },
+    {
+      "id": "ent_oitem001",
+      "name": "OrderItem",
+      "attributes": [
+        { "name": "quantity",   "type": "integer", "required": true,  "unique": false },
+        { "name": "unit_price", "type": "decimal", "required": true,  "unique": false }
+      ],
+      "states": ["Active"],
+      "owned_by_actor_id": null
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_ord2item",
+      "from_entity_id": "ent_order001",
+      "to_entity_id": "ent_oitem001",
+      "kind": "one_to_many",
+      "name": "order_items"
+    },
+    {
+      "id": "rel_itm2prod",
+      "from_entity_id": "ent_oitem001",
+      "to_entity_id": "ent_prod0001",
+      "kind": "one_to_many",
+      "name": "product"
+    }
+  ],
+  "business_rules": [
+    {
+      "id": "rule_stock01",
+      "description": "Product stock must be sufficient before an order can be confirmed.",
+      "trigger_condition": "When Order transitions from Pending to Confirmed",
+      "enforcement_action": "Reject with 422 if any OrderItem.quantity exceeds Product.stock"
+    },
+    {
+      "id": "rule_total01",
+      "description": "Order total must equal the sum of all OrderItem unit_price × quantity values.",
+      "trigger_condition": "When an Order is created or an OrderItem is added",
+      "enforcement_action": "Recalculate and update Order.total automatically; reject if mismatch on read"
+    },
+    {
+      "id": "rule_cancel01",
+      "description": "An order can only be cancelled while in Pending state.",
+      "trigger_condition": "When a Customer requests cancellation",
+      "enforcement_action": "Reject with 409 if Order.state is not Pending"
+    }
+  ],
+  "use_cases": [
+    {
+      "id": "uc_browse01",
+      "name": "Browse Products",
+      "type": "query",
+      "actor_id": "act_cust0001",
+      "primary_entity_id": "ent_prod0001",
+      "business_rule_ids": [],
+      "description": "Customer views the product catalog with filtering and sorting options."
+    },
+    {
+      "id": "uc_placeord",
+      "name": "Place Order",
+      "type": "command",
+      "actor_id": "act_cust0001",
+      "primary_entity_id": "ent_order001",
+      "business_rule_ids": ["rule_stock01", "rule_total01"],
+      "description": "Customer submits a cart as a new order; stock is verified and total is calculated."
+    },
+    {
+      "id": "uc_viewhist",
+      "name": "View Order History",
+      "type": "query",
+      "actor_id": "act_cust0001",
+      "primary_entity_id": "ent_order001",
+      "business_rule_ids": [],
+      "description": "Customer views their past and current orders with status updates."
+    },
+    {
+      "id": "uc_managprd",
+      "name": "Manage Product Catalog",
+      "type": "command",
+      "actor_id": "act_admin001",
+      "primary_entity_id": "ent_prod0001",
+      "business_rule_ids": [],
+      "description": "Admin creates, updates, and removes products including stock levels."
+    },
+    {
+      "id": "uc_allordr",
+      "name": "View All Orders",
+      "type": "query",
+      "actor_id": "act_admin001",
+      "primary_entity_id": "ent_order001",
+      "business_rule_ids": [],
+      "description": "Admin views all customer orders and can update their state."
+    }
+  ]
+}
