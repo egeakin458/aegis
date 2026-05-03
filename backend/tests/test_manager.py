@@ -12,17 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.pipeline.manager import RunnerEntry, RunnerManager, _create_agents
-from app.schemas.customer_config import (
-    BusinessContext,
-    BusinessSize,
-    CustomerConfig,
-    DataRequirements,
-    FeatureRequest,
-    Features,
-    IndustryType,
-    ProblemStatement,
-    UserType,
-)
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import (
     AgentName,
     EventType,
@@ -33,23 +23,8 @@ from app.schemas.pipeline_events import (
 
 
 @pytest.fixture
-def minimal_config() -> CustomerConfig:
-    return CustomerConfig(
-        business_context=BusinessContext(
-            name="Test Co",
-            industry=IndustryType.OTHER,
-            description="Test company",
-            size=BusinessSize.SOLO,
-        ),
-        problem_statement=ProblemStatement(
-            problem="Need a website",
-            users=[UserType.OWNER],
-        ),
-        features=Features(
-            requested=[FeatureRequest(description="Landing page", priority=1)]
-        ),
-        data=DataRequirements(entities=[]),
-    )
+def minimal_config(ddc_ecommerce) -> CustomerConfigV2:
+    return ddc_ecommerce
 
 
 @pytest.fixture

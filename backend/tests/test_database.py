@@ -24,17 +24,7 @@ import pytest_asyncio
 
 from app.db.database import close_db, get_connection, init_db
 from app.db.repositories import get_events, get_run, save_event, save_run, update_run
-from app.schemas.customer_config import (
-    BusinessContext,
-    BusinessSize,
-    CustomerConfig,
-    DataRequirements,
-    FeatureRequest,
-    Features,
-    IndustryType,
-    ProblemStatement,
-    UserType,
-)
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import (
     AgentName,
     EventType,
@@ -59,24 +49,9 @@ async def setup_db():
 
 
 @pytest.fixture
-def minimal_customer_config() -> CustomerConfig:
-    """Minimal valid CustomerConfig for repository tests."""
-    return CustomerConfig(
-        business_context=BusinessContext(
-            name="Test",
-            industry=IndustryType.OTHER,
-            description="Test",
-            size=BusinessSize.SOLO,
-        ),
-        problem_statement=ProblemStatement(
-            problem="Test",
-            users=[UserType.OWNER],
-        ),
-        features=Features(
-            requested=[FeatureRequest(description="Test feature", priority=1)]
-        ),
-        data=DataRequirements(entities=[]),
-    )
+def minimal_customer_config(ddc_ecommerce) -> CustomerConfigV2:
+    """Minimal valid CustomerConfigV2 (DDC) for repository tests."""
+    return ddc_ecommerce
 
 
 @pytest.fixture
@@ -236,7 +211,8 @@ class TestSaveRunAndGetRun:
         await save_run(minimal_pipeline_run, minimal_customer_config)
         row = await get_run(minimal_pipeline_run.run_id)
         config_data = json.loads(row["customer_config_json"])
-        assert config_data["business_context"]["name"] == "Test"
+        assert config_data["schema_version"] == "ddc-v1"
+        assert "context" in config_data
 
     @pytest.mark.asyncio
     async def test_save_run_persists_total_tokens(

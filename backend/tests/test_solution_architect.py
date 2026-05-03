@@ -16,7 +16,7 @@ import pytest
 
 from app.agents.solution_architect import SolutionArchitect
 from app.schemas.agent_outputs import TechnicalDesign, APIEndpoint, DataModel
-from app.schemas.customer_config_v2 import CustomerConfigV2
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import EventType
 
 
@@ -77,11 +77,6 @@ def _make_agent() -> SolutionArchitect:
 class TestDDCSASync:
     """Sync tests for SA DDC prompt and APIEndpoint schema."""
 
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.solution_architect.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
-
     def test_ddc_system_prompt_mentions_feature_id(self):
         agent = _make_agent()
         assert "feature_id" in agent.system_prompt
@@ -129,11 +124,6 @@ class TestDDCSASync:
 @pytest.mark.asyncio
 class TestDDC:
     """Async execute() tests for SA in DDC mode."""
-
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.solution_architect.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
 
     def _design_matching_golden(self, ddc: CustomerConfigV2) -> dict:
         """Build a TechnicalDesign dict that mirrors the golden fixture's entities/use cases."""

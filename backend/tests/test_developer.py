@@ -27,7 +27,7 @@ from app.schemas.agent_outputs import (
     UIComponent,
     FileSpec,
 )
-from app.schemas.customer_config_v2 import CustomerConfigV2
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import EventType
 
 
@@ -151,11 +151,6 @@ def _make_dev_response(payload: dict) -> MagicMock:
 class TestDDCDevSync:
     """Sync tests for Developer DDC prompt."""
 
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.developer.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
-
     def _make_agent(self) -> Developer:
         return Developer()
 
@@ -223,11 +218,6 @@ class TestDDCDevSync:
 @pytest.mark.asyncio
 class TestDDC:
     """Async execute() tests for Developer in DDC mode."""
-
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.developer.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
 
     def _make_agent(self) -> Developer:
         return Developer()

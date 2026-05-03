@@ -4,59 +4,30 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { BusinessContextSection } from './sections/business-context'
-import { ProblemStatementSection } from './sections/problem-statement'
-import { FeaturesSection } from './sections/features'
-import { DataContentSection } from './sections/data-content'
-import { DesignSection } from './sections/design'
-import { TechnicalSection } from './sections/technical'
-import { TimelineSection } from './sections/timeline'
 import { FreeTextSection } from './sections/free-text'
 import { ActorsSection } from './sections/actors'
 import { EntitiesSection } from './sections/entities'
 import { RelationshipsSection } from './sections/relationships'
 import { BusinessRulesSection } from './sections/rules'
 import { UseCasesSection } from './sections/use-cases'
-import { intakeFormSchema, intakeFormDefaults, freeTextFormSchema, freeTextFormDefaults, type IntakeFormValues, type FreeTextFormValues } from '@/lib/schemas/intake-form'
+import { freeTextFormSchema, freeTextFormDefaults, type FreeTextFormValues } from '@/lib/schemas/intake-form'
 import { CustomerConfigV2Schema, type CustomerConfigV2 } from '@/lib/schemas/ddc'
-import { mapFormToCustomerConfig } from '@/lib/mappers/config'
 import { mapFreeTextToDDC } from '@/lib/mappers/free-text'
 
-type IntakeMode = 'legacy' | 'free-text' | 'structured'
+type IntakeMode = 'free-text' | 'structured'
 const MODE_KEY = 'aegis_intake_mode'
 
-const SECTIONS = [
-  'Business Context',
-  'Problem Statement',
-  'Features',
-  'Data & Content',
-  'Design',
-  'Technical',
-  'Timeline',
-]
-
-// Which fields belong to each section (for per-section validation trigger)
-const SECTION_FIELDS: (keyof IntakeFormValues)[][] = [
-  ['companyName', 'industry', 'businessSize', 'targetUsers'],
-  ['currentSituation', 'desiredOutcome'],
-  ['mustHaveFeatures'],
-  ['dataTypes', 'dataVolume'],
-  ['visualStyle', 'mobileSupport'],
-  ['accessScope'],
-  ['projectName'],
-]
+const STRUCTURED_SECTIONS = ['Actors', 'Entities', 'Relationships', 'Rules', 'Use Cases']
 
 interface Props {
   open: boolean
   onClose: () => void
-  onSubmit?: (config: ReturnType<typeof mapFormToCustomerConfig>) => void
+  onSubmit?: (config: CustomerConfigV2) => void
 }
-
-const STRUCTURED_SECTIONS = ['Actors', 'Entities', 'Relationships', 'Rules', 'Use Cases']
 
 export function IntakeModal({ open, onClose, onSubmit }: Props) {
   const [section, setSection] = useState(0)
-  const [mode, setMode] = useState<IntakeMode>('legacy')
+  const [mode, setMode] = useState<IntakeMode>('free-text')
 
   // Persist mode choice
   useEffect(() => {
@@ -68,14 +39,6 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
     localStorage.setItem(MODE_KEY, m)
     setSection(0)
   }
-
-  // Legacy form
-  const legacyForm = useForm<IntakeFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(intakeFormSchema) as any,
-    defaultValues: intakeFormDefaults,
-    mode: 'onTouched',
-  })
 
   // Free-text DDC form
   const freeTextForm = useForm<FreeTextFormValues>({
@@ -102,43 +65,31 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
   })
 
   async function handleNext() {
-    if (mode === 'legacy') {
-      const fields = SECTION_FIELDS[section]
-      const valid = await legacyForm.trigger(fields)
-      if (valid) setSection(s => Math.min(SECTIONS.length - 1, s + 1))
-    } else if (mode === 'structured') {
+    if (mode === 'structured') {
       setSection(s => Math.min(STRUCTURED_SECTIONS.length - 1, s + 1))
     }
-  }
-
-  function handleLegacySubmit(values: IntakeFormValues) {
-    const config = mapFormToCustomerConfig(values)
-    console.log('[IntakeModal] CustomerConfig:', JSON.stringify(config, null, 2))
-    onSubmit?.(config as never)
-    onClose()
   }
 
   function handleFreeTextSubmit(values: FreeTextFormValues) {
     const ddc = mapFreeTextToDDC(values)
     console.log('[IntakeModal] DDC (free-text):', JSON.stringify(ddc, null, 2))
-    onSubmit?.(ddc as never)
+    onSubmit?.(ddc as CustomerConfigV2)
     onClose()
   }
 
   function handleStructuredSubmit(values: CustomerConfigV2) {
     console.log('[IntakeModal] DDC (structured):', JSON.stringify(values, null, 2))
-    onSubmit?.(values as never)
+    onSubmit?.(values)
     onClose()
   }
 
   function handleClose() {
-    legacyForm.reset()
     freeTextForm.reset()
     setSection(0)
     onClose()
   }
 
-  const currentSections = mode === 'structured' ? STRUCTURED_SECTIONS : SECTIONS
+  const currentSections = mode === 'structured' ? STRUCTURED_SECTIONS : ['Quick']
   const maxSection = currentSections.length - 1
 
   return (
@@ -161,7 +112,7 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
           <div className="flex items-center gap-3">
             {/* Mode toggle */}
             <div className="flex gap-1 text-xs">
-              {(['legacy', 'free-text', 'structured'] as IntakeMode[]).map(m => (
+              {(['free-text', 'structured'] as IntakeMode[]).map(m => (
                 <button
                   key={m}
                   type="button"
@@ -170,7 +121,7 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
                     mode === m ? 'bg-slate-700 text-slate-200' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  {m === 'legacy' ? 'Classic' : m === 'free-text' ? 'Quick' : 'Advanced'}
+                  {m === 'free-text' ? 'Quick' : 'Advanced'}
                 </button>
               ))}
             </div>
@@ -180,8 +131,8 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
           </div>
         </div>
 
-        {/* Section tabs (legacy and structured only) */}
-        {mode !== 'free-text' && (
+        {/* Section tabs (structured only) */}
+        {mode === 'structured' && (
           <div className="flex gap-1 px-6 pt-4 flex-wrap shrink-0">
             {currentSections.map((s, i) => (
               <button
@@ -200,22 +151,6 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
               </button>
             ))}
           </div>
-        )}
-
-        {/* Section content — legacy */}
-        {mode === 'legacy' && (
-          <form
-            onSubmit={legacyForm.handleSubmit(handleLegacySubmit)}
-            className="flex-1 overflow-y-auto px-6 py-5"
-          >
-            {section === 0 && <BusinessContextSection form={legacyForm} />}
-            {section === 1 && <ProblemStatementSection form={legacyForm} />}
-            {section === 2 && <FeaturesSection form={legacyForm} />}
-            {section === 3 && <DataContentSection form={legacyForm} />}
-            {section === 4 && <DesignSection form={legacyForm} />}
-            {section === 5 && <TechnicalSection form={legacyForm} />}
-            {section === 6 && <TimelineSection form={legacyForm} />}
-          </form>
         )}
 
         {/* Section content — free-text DDC */}
@@ -252,7 +187,7 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
           >
             Back
           </button>
-          {(mode !== 'free-text' && section < maxSection) ? (
+          {(mode === 'structured' && section < maxSection) ? (
             <button
               type="button"
               onClick={handleNext}
@@ -264,9 +199,7 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
             <button
               type="button"
               onClick={
-                mode === 'legacy'
-                  ? legacyForm.handleSubmit(handleLegacySubmit)
-                  : mode === 'free-text'
+                mode === 'free-text'
                   ? freeTextForm.handleSubmit(handleFreeTextSubmit)
                   : structuredForm.handleSubmit(handleStructuredSubmit)
               }

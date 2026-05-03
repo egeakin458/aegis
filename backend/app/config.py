@@ -36,9 +36,6 @@ class Settings(BaseSettings):
     # Output
     output_dir: str = "outputs"  # Where generated code projects are saved
 
-    # DDC feature flag
-    use_ddc: bool = False
-
     # Build checker
     enable_full_build_check: bool = False
     full_build_timeout_seconds: int = 180

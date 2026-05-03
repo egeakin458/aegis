@@ -10,7 +10,7 @@ import pathlib
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.customer_config_v2 import (
+from app.schemas.customer_config import (
     Actor,
     Attribute,
     BusinessRule,

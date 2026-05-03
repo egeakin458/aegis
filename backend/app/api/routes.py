@@ -23,10 +23,8 @@ from sse_starlette.sse import EventSourceResponse
 from app.config import settings
 from app.db import repositories as repo
 from app.pipeline.manager import runner_manager
-from app.schemas.customer_config import CustomerConfig
-from app.schemas.customer_config_v2 import CustomerConfigV2, SCHEMA_VERSION as DDC_SCHEMA_VERSION
+from app.schemas.customer_config import CustomerConfigV2, SCHEMA_VERSION as DDC_SCHEMA_VERSION
 from app.schemas.pipeline_events import EventType, PipelineState
-from app.utils.feature_id import slug_feature_id
 
 logger = logging.getLogger(__name__)
 
@@ -46,17 +44,15 @@ _SSE_KEEPALIVE_TIMEOUT = 30.0  # seconds between keepalive pings
 async def start_pipeline(body: dict[str, Any] = Body(...)):
     """Start a new pipeline run. Returns the run_id immediately.
 
-    Accepts both legacy CustomerConfig and DDC CustomerConfigV2 payloads.
-    DDC payloads are identified by schema_version == "ddc-v1".
+    Accepts a DDC CustomerConfigV2 payload (schema_version == "ddc-v1").
     """
+    if body.get("schema_version") != DDC_SCHEMA_VERSION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only DDC payloads are supported (schema_version must be '{DDC_SCHEMA_VERSION}').",
+        )
     try:
-        if body.get("schema_version") == DDC_SCHEMA_VERSION:
-            config = CustomerConfigV2(**body)
-        else:
-            config = CustomerConfig(**body)
-            for feature in config.features.requested:
-                if not feature.feature_id:
-                    feature.feature_id = slug_feature_id(feature.description)
+        config = CustomerConfigV2(**body)
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors())
     run_id = await runner_manager.start_run(config)

@@ -31,7 +31,7 @@ from app.schemas.agent_outputs import (
     CodeFile,
     FeatureImplementation,
 )
-from app.schemas.customer_config_v2 import CustomerConfigV2
+from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import EventType
 
 
@@ -179,11 +179,6 @@ def _make_qa_response(payload: dict) -> MagicMock:
 class TestDDCQASync:
     """Sync tests for QA Reviewer DDC prompt."""
 
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.qa_reviewer.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
-
     def _make_agent(self) -> QAReviewer:
         return QAReviewer()
 
@@ -235,11 +230,6 @@ class TestDDCQASync:
 @pytest.mark.asyncio
 class TestDDC:
     """Async execute() tests for QA Reviewer in DDC mode."""
-
-    @pytest.fixture(autouse=True)
-    def patch_use_ddc(self, monkeypatch):
-        monkeypatch.setattr("app.agents.qa_reviewer.settings.use_ddc", True)
-        monkeypatch.setattr("app.config.settings.use_ddc", True)
 
     def _make_agent(self) -> QAReviewer:
         return QAReviewer()

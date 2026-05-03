@@ -1,35 +1,12 @@
 """
 Schema validation tests.
 
-Verifies that all Pydantic schemas can be instantiated with example data
+Verifies that the Pydantic schemas can be instantiated with example data
 and that validation constraints work correctly.
 """
 
-from datetime import datetime, timezone
-
 import pytest
 
-from app.schemas.customer_config import (
-    AssumedField,
-    BusinessContext,
-    BusinessSize,
-    ClarificationQuestion,
-    ClarificationRound,
-    CustomerConfig,
-    DataRequirements,
-    DesignPreferences,
-    DesignStyle,
-    FeatureRequest,
-    Features,
-    FileUpload,
-    FinalizedConfig,
-    IndustryType,
-    MobileSupport,
-    ProblemStatement,
-    ProjectMeta,
-    TechnicalRequirements,
-    UserType,
-)
 from app.schemas.agent_outputs import (
     APIEndpoint,
     CodeFile,
@@ -63,52 +40,6 @@ from app.schemas.evaluation import (
 # ============================================================
 # Fixtures — reusable example data
 # ============================================================
-
-@pytest.fixture
-def sample_customer_config() -> CustomerConfig:
-    return CustomerConfig(
-        business_context=BusinessContext(
-            name="Cafe Latte",
-            industry=IndustryType.FOOD_AND_BEVERAGE,
-            description="A small coffee shop chain with 3 locations.",
-            size=BusinessSize.SMALL,
-        ),
-        problem_statement=ProblemStatement(
-            problem="We need an online ordering system for pickup orders.",
-            users=[UserType.CUSTOMERS, UserType.EMPLOYEES],
-            current_process="Phone calls and walk-ins only.",
-        ),
-        features=Features(
-            requested=[
-                FeatureRequest(description="Menu display with categories", priority=1),
-                FeatureRequest(description="Shopping cart and checkout", priority=2),
-                FeatureRequest(description="Order status tracking", priority=3),
-            ]
-        ),
-        data=DataRequirements(entities=[
-            {"name": "MenuItem", "description": "A menu item", "estimated_volume": None},
-            {"name": "Order", "description": "A customer order", "estimated_volume": None},
-            {"name": "Customer", "description": "A customer", "estimated_volume": None},
-        ]),
-    )
-
-
-@pytest.fixture
-def sample_finalized_config(sample_customer_config: CustomerConfig) -> FinalizedConfig:
-    return FinalizedConfig(
-        config=sample_customer_config,
-        assumptions=[
-            AssumedField(
-                field_path="technical.auth_required",
-                original_value=None,
-                assumed_value="true",
-                reasoning="Customers need accounts to track orders.",
-            ),
-        ],
-        project_summary="Online ordering system for a 3-location coffee shop.",
-        is_complete=True,
-    )
-
 
 @pytest.fixture
 def sample_technical_design() -> TechnicalDesign:
@@ -197,81 +128,6 @@ def sample_qa_review() -> QAReview:
         code_quality_score=4,
         summary="Application meets requirements. Minor code quality improvements suggested.",
     )
-
-
-# ============================================================
-# Customer Config Tests
-# ============================================================
-
-class TestCustomerConfig:
-    def test_full_config(self, sample_customer_config: CustomerConfig):
-        assert sample_customer_config.business_context.name == "Cafe Latte"
-        assert len(sample_customer_config.features.requested) == 3
-
-    def test_minimal_config(self):
-        config = CustomerConfig(
-            business_context=BusinessContext(
-                name="Test Co",
-                industry=IndustryType.OTHER,
-                industry_other="Consulting",
-                description="A test company.",
-                size=BusinessSize.SOLO,
-            ),
-            problem_statement=ProblemStatement(
-                problem="Need a website.",
-                users=[UserType.OWNER],
-            ),
-            features=Features(
-                requested=[FeatureRequest(description="Landing page", priority=1)]
-            ),
-            data=DataRequirements(entities=[]),
-        )
-        assert config.design.style == DesignStyle.NO_PREFERENCE
-        assert config.technical.mobile == MobileSupport.NICE_TO_HAVE
-        assert config.meta.submitted_at is not None
-
-    def test_feature_priority_must_be_positive(self):
-        with pytest.raises(Exception):
-            FeatureRequest(description="Bad feature", priority=0)
-
-    def test_features_must_have_at_least_one(self):
-        with pytest.raises(Exception):
-            Features(requested=[])
-
-    def test_users_must_have_at_least_one(self):
-        with pytest.raises(Exception):
-            ProblemStatement(problem="test", users=[])
-
-
-class TestFinalizedConfig:
-    def test_full_finalized(self, sample_finalized_config: FinalizedConfig):
-        assert sample_finalized_config.is_complete is True
-        assert len(sample_finalized_config.assumptions) == 1
-        assert sample_finalized_config.assumptions[0].field_path == "technical.auth_required"
-
-    def test_with_clarification_history(self, sample_customer_config: CustomerConfig):
-        config = FinalizedConfig(
-            config=sample_customer_config,
-            clarification_history=[
-                ClarificationRound(
-                    round_number=1,
-                    questions=[
-                        ClarificationQuestion(
-                            id="q1",
-                            topic="authentication",
-                            original_input="Need a website",
-                            question="Do customers need to create accounts?",
-                            suggestions=["Yes", "No", "Optional"],
-                        ),
-                    ],
-                    answers={"q1": "Yes"},
-                ),
-            ],
-            project_summary="Test project.",
-            is_complete=True,
-        )
-        assert len(config.clarification_history) == 1
-        assert config.clarification_history[0].answers["q1"] == "Yes"
 
 
 # ============================================================
@@ -469,11 +325,6 @@ class TestEvaluation:
 class TestCrossSchemaConsistency:
     """Verify that schemas align with the pipeline data flow."""
 
-    def test_ra_output_feeds_sa_input(self, sample_finalized_config: FinalizedConfig):
-        """FinalizedConfig contains a CustomerConfig that SA can read."""
-        assert isinstance(sample_finalized_config.config, CustomerConfig)
-        assert sample_finalized_config.config.features.requested[0].description
-
     def test_sa_output_feeds_dev_input(self, sample_technical_design: TechnicalDesign):
         """TechnicalDesign has file_structure that Developer should implement."""
         assert len(sample_technical_design.file_structure) > 0
@@ -489,9 +340,3 @@ class TestCrossSchemaConsistency:
         expected = {"requirements_analyst", "solution_architect", "developer", "qa_reviewer", "system"}
         actual = {a.value for a in AgentName}
         assert actual == expected
-
-    def test_serialization_roundtrip(self, sample_customer_config: CustomerConfig):
-        """Schema can be serialized to JSON and deserialized back."""
-        json_str = sample_customer_config.model_dump_json()
-        restored = CustomerConfig.model_validate_json(json_str)
-        assert restored.business_context.name == sample_customer_config.business_context.name
