@@ -1,0 +1,109 @@
+{
+  "task_id": "benchmark_02_todo_ddc",
+  "name": "Personal To-Do List (DDC v1)",
+  "description": "A simple to-do list application where a user can create, view, complete, and delete tasks organized by categories. Uses DDC v1 schema.",
+  "complexity": "simple",
+  "customer_config_v2": {
+    "schema_version": "ddc-v1",
+    "context": {
+      "name": "taskmaster",
+      "domain_description": "A personal task manager where a user can create tasks, organize them into categories, mark tasks as complete, and delete tasks they no longer need.",
+      "industry": "services",
+      "visual_style": "clean_minimal",
+      "mobile_first": false
+    },
+    "actors": [
+      {
+        "id": "act_owner001",
+        "role_name": "Owner",
+        "auth_method": "anonymous",
+        "permissions_description": "Can create, view, complete, and delete their own tasks and categories."
+      }
+    ],
+    "entities": [
+      {
+        "id": "ent_task0001",
+        "name": "Task",
+        "attributes": [
+          { "name": "title",       "type": "string",  "required": true,  "unique": false },
+          { "name": "description", "type": "text",    "required": false, "unique": false },
+          { "name": "completed",   "type": "boolean", "required": true,  "unique": false },
+          { "name": "created_at",  "type": "datetime","required": true,  "unique": false }
+        ],
+        "states": ["Active", "Completed"],
+        "owned_by_actor_id": "act_owner001"
+      },
+      {
+        "id": "ent_cat00001",
+        "name": "Category",
+        "attributes": [
+          { "name": "name", "type": "string", "required": true, "unique": true }
+        ],
+        "states": ["Active"],
+        "owned_by_actor_id": "act_owner001"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel_task2cat",
+        "from_entity_id": "ent_task0001",
+        "to_entity_id": "ent_cat00001",
+        "kind": "many_to_one",
+        "name": "belongs_to_category"
+      }
+    ],
+    "business_rules": [],
+    "use_cases": [
+      {
+        "id": "uc_addtask1",
+        "name": "Create Task",
+        "type": "command",
+        "actor_id": "act_owner001",
+        "primary_entity_id": "ent_task0001",
+        "business_rule_ids": [],
+        "description": "Owner adds a new task with an optional category assignment."
+      },
+      {
+        "id": "uc_listtas1",
+        "name": "List Tasks",
+        "type": "query",
+        "actor_id": "act_owner001",
+        "primary_entity_id": "ent_task0001",
+        "business_rule_ids": [],
+        "description": "Owner views all tasks, optionally filtered by category or completion status."
+      },
+      {
+        "id": "uc_complte1",
+        "name": "Complete Task",
+        "type": "command",
+        "actor_id": "act_owner001",
+        "primary_entity_id": "ent_task0001",
+        "business_rule_ids": [],
+        "description": "Owner marks a task as completed."
+      },
+      {
+        "id": "uc_dltask01",
+        "name": "Delete Task",
+        "type": "command",
+        "actor_id": "act_owner001",
+        "primary_entity_id": "ent_task0001",
+        "business_rule_ids": [],
+        "description": "Owner permanently deletes a task."
+      }
+    ]
+  },
+  "expected_features": [
+    "Create new tasks with a title and optional description",
+    "Organize tasks into categories",
+    "Mark tasks as complete",
+    "Delete tasks",
+    "Filter tasks by category"
+  ],
+  "unit_tests": [
+    "POST /api/tasks creates a task and returns 201",
+    "GET /api/tasks returns an array of tasks",
+    "PATCH /api/tasks/:id marks task as completed",
+    "DELETE /api/tasks/:id removes the task",
+    "GET /api/categories returns category list"
+  ]
+}
