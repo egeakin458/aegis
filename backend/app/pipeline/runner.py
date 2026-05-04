@@ -303,7 +303,7 @@ class PipelineRunner:
             message="Verifying the generated code structure and syntax.",
         ))
 
-        result = await run_build_check(code_output)
+        result = await run_build_check(code_output, run_id=self.current_run.run_id)
         self.context["build_check_result"] = result
 
         if result.passed:
