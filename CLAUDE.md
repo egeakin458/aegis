@@ -8,6 +8,31 @@ Aegis is a multi-agent AI pipeline that operates as a virtual software company. 
 
 Senior thesis project — Izmir University of Economics, Computer Engineering.
 
+## Recommended Next Step — End-to-End Evaluation (as of 2026-05-03)
+
+The DDC v1 migration is complete and merged to `main`. No real pipeline run has ever completed — `backend/outputs/` is empty. The next priority is a live benchmark run to validate actual output quality before any further development.
+
+**Run the DDC benchmark:**
+
+```bash
+# Terminal 1 — start backend
+cd backend && source venv/bin/activate
+uvicorn app.main:app --port 8000
+
+# Terminal 2 — run benchmark
+python evaluation/run_benchmark.py evaluation/benchmarks/benchmark_02_todo_ddc.json
+```
+
+**What to verify after the run:**
+1. Does the generated app start? (`cd outputs/<run_id> && npm install && npm run dev`)
+2. Do all four use cases have working endpoints? (`POST /api/tasks`, `GET /api/tasks`, `PATCH /api/tasks/:id`, `DELETE /api/tasks/:id`)
+3. Did the QA Reviewer approve on first pass, or did it trigger a revision cycle?
+4. Is the QA score realistic (not always 4–5)?
+
+**Two most likely failure modes to fix:**
+- Generated JS is syntactically broken or has bad imports → tighten Developer system prompt with concrete file templates
+- QA Reviewer approves bad code → add stricter scoring criteria (e.g. require explicit `npm run build` success evidence)
+
 ## Pipeline Refactor v0.2.0 (merged 2026-05-03)
 
 6-phase refactor merged from `feat/pipeline-refactor`. Full plan: `~/.claude/projects/-home-ege-projects-aegis/memory/project_pipeline_refactor_plan_updated.md`
@@ -23,7 +48,49 @@ Senior thesis project — Izmir University of Economics, Computer Engineering.
 
 Tagged: `v0.2.0-pipeline-refactor`
 
-## DDC v1 — Domain-Driven Configuration (in progress on `feat/ddc-v1`)
+## Build Verification — Pre-Seeded Sandbox (added 2026-05-04)
+
+Full `next build` verification runs against `backend/build_sandbox/`, a fixed pre-installed dep set. Per-run workdirs hardlink the sandbox `node_modules` into `backend/build_sandbox/_runs/{run_id}/` so `next build` runs in ~30 s with no `npm install` on the hot path.
+
+### One-time setup (after clone or after changing sandbox deps)
+
+```bash
+bash backend/scripts/setup_build_sandbox.sh           # install + stub
+bash backend/scripts/setup_build_sandbox.sh --force   # rebuild from scratch
+```
+
+The script installs the deps in `backend/build_sandbox/package.json` with `--ignore-scripts` (skips native compilation), then **stubs `better-sqlite3`** by overwriting `node_modules/better-sqlite3/lib/index.js` with a no-op JS class. This eliminates the native-compilation dependency — the sandbox runs anywhere Node runs. Only the build check sees the stub; customer deployments install the real package fresh.
+
+### Enabling full build check
+
+In `backend/.env`:
+
+```
+ENABLE_FULL_BUILD_CHECK=true
+```
+
+`build_sandbox_dir` (default `"build_sandbox"`) is resolved relative to the backend cwd.
+
+### Dep allowlist
+
+`backend/app/pipeline/build_checker.py:_ALLOWED_DEPS` is the set of deps installed in the sandbox. Generated `package.json` declaring anything outside this set fails the lightweight check with a `dep_drift` issue. To add a dep: extend the allowlist, extend `backend/build_sandbox/package.json`, rerun `setup_build_sandbox.sh --force`.
+
+### What full build catches that lightweight cannot
+
+- Broken imports (`Module not found`)
+- Wrong Next.js 14 App Router export signatures (default vs named `GET/POST`)
+- Missing `"use client"` directives
+- JSX errors and Tailwind/PostCSS misconfig
+- Any failure surfaced at `next build` time
+
+### What it still doesn't catch
+
+- Runtime SQL bugs (better-sqlite3 is stubbed during build verification)
+- Endpoint-level logic errors
+
+Those remain QA's responsibility; a runtime smoke test is a separate future addition.
+
+## DDC v1 — Domain-Driven Configuration (merged to `main` 2026-05-03)
 
 Replaces the conversational `CustomerConfig` with a strict 4D contract: **Actor / DomainEntity / UseCase / BusinessRule** + Relationships. A Pydantic `model_validator` enforces referential integrity at parse time. `use_case.id` becomes the new `feature_id` (preserves Phase-2 threading). Full plan: `docs/Domain_Driven_Configuration_Plan.md`.
 
@@ -48,20 +115,13 @@ use_cases[]:     id (uc_XXXXXXXX), name, type (command|query), actor_id,
 **Referential integrity** enforced by `model_validator(mode="after")` on `CustomerConfigV2`:
 actor IDs, entity IDs, and rule IDs referenced by other objects must exist in their respective lists.
 
-### DDC v1 Feature Flag
-
-`settings.use_ddc: bool = False` (`.env: USE_DDC=true`). Gating:
-- **Runner**: `self._use_ddc` at init; all handlers branch on it. DDC stores `customer_config_v2` in context; legacy stores `finalized_config`.
-- **API** `/start`: parses `dict` body, discriminates on `schema_version == "ddc-v1"`.
-- **C14**: flag flipped to `True` by default. **C15**: legacy deleted.
-
 ### Intake Modes (Frontend)
 
-Three-way toggle in `IntakeModal`: **Classic** (legacy 7-section form) | **Quick** (free-text DDC) | **Advanced** (structured DDC builder). Mode persisted in `localStorage` under key `aegis_intake_mode`.
+Two-way toggle in `IntakeModal`: **Quick** (`free-text` mode) | **Advanced** (`structured` mode). Mode persisted in `localStorage` under key `aegis_intake_mode`.
 
-**Quick (free-text)** — `FreeTextSection` → `mapFreeTextToDDC()` → minimal DDC with one placeholder Actor/Entity/UseCase. RA expands it.
+**Quick** — `FreeTextSection` → `mapFreeTextToDDC()` → minimal DDC with one placeholder Actor/Entity/UseCase. RA expands it.
 
-**Advanced (structured)** — 5 sections using `useFieldArray`:
+**Advanced** — 5 sections using `useFieldArray`:
 1. Actors — role_name, auth_method, permissions_description
 2. Entities — name, attributes (nested field array), states, owned_by_actor_id
 3. Relationships — from/to entity selects, kind, name
@@ -70,9 +130,9 @@ Three-way toggle in `IntakeModal`: **Classic** (legacy 7-section form) | **Quick
 
 **Key files**:
 - `frontend/lib/schemas/ddc.ts` — Zod v4 mirror of `CustomerConfigV2`
-- `frontend/lib/schemas/intake-form.ts` — `freeTextFormSchema` + `FreeTextFormValues`
+- `frontend/lib/schemas/intake-form.ts` — `FreeTextFormValues` for Quick mode
 - `frontend/lib/mappers/free-text.ts` — `mapFreeTextToDDC()`
-- `frontend/lib/mappers/config.ts` — `mapFormToDDC()` (delegates); `mapFormToCustomerConfig()` preserved until C15
+- `frontend/lib/mappers/config.ts` — `mapFormToDDC()` for Advanced mode
 - `frontend/components/intake-modal/sections/` — `free-text.tsx`, `actors.tsx`, `entities.tsx`, `relationships.tsx`, `rules.tsx`, `use-cases.tsx`
 
 ### Jest test environment note
@@ -95,8 +155,8 @@ uvicorn app.main:app --reload --port 8000
 
 pytest tests/                                                              # all tests
 pytest tests/test_schemas.py                                               # single file
-pytest tests/test_schemas.py::TestCustomerConfig                           # single class
-pytest tests/test_schemas.py::TestCustomerConfig::test_minimal_config      # single test
+pytest tests/test_schemas_v2.py::TestCustomerConfigV2                      # single class
+pytest tests/test_schemas_v2.py::TestCustomerConfigV2::test_minimal_config # single test
 ```
 
 ### Frontend (run from `frontend/`)
@@ -122,11 +182,11 @@ Dev harness (visual states without a real run): `http://localhost:3000/dev/entri
 ### Pipeline Data Flow
 
 ```
-CustomerConfig → RA → FinalizedConfig → SA → TechnicalDesign → Dev → CodeOutput → QA → QAReview
-                                                                                        ↓
-                                                                          approve → done
-                                                                          revise_code → Dev (max 2 cycles)
-                                                                          revise_design → SA (max 1 cycle)
+CustomerConfigV2 → RA → CustomerConfigV2 (finalized) → SA → TechnicalDesign → Dev → CodeOutput → QA → QAReview
+                                                                                                        ↓
+                                                                                          approve → done
+                                                                                          revise_code → Dev (max 2 cycles)
+                                                                                          revise_design → SA (max 1 cycle)
 ```
 
 ### Three-Layer Architecture
@@ -146,7 +206,7 @@ All under prefix `/api/pipeline`:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/start` | Submit `CustomerConfig` or `CustomerConfigV2` (DDC), returns `run_id` |
+| POST | `/start` | Submit `CustomerConfigV2` (DDC), returns `run_id` |
 | GET | `/{run_id}/events` | SSE stream — replays existing events, then live stream |
 | POST | `/{run_id}/clarification` | Submit answers to resume paused pipeline |
 | GET | `/{run_id}/status` | Current state, tokens, feedback cycles |
@@ -171,7 +231,7 @@ All under prefix `/api/pipeline`:
 
 ### Special Schema: RAOutput
 
-The Requirements Analyst is unique — it uses `RAOutput` (not `FinalizedConfig` directly) as its output schema. `RAOutput` has a `needs_clarification` discriminator: when true, it contains questions; when false, it contains a `FinalizedConfig`. The `PipelineRunner._run_requirements()` method handles both branches.
+The Requirements Analyst is unique — it uses `RAOutputDDC` (not `CustomerConfigV2` directly) as its output schema. `RAOutputDDC` has a `needs_clarification` discriminator: when true, it contains clarification questions; when false, it contains a finalized `CustomerConfigV2`. The `PipelineRunner._run_requirements()` method handles both branches.
 
 ### Pipeline State Machine
 
@@ -201,7 +261,7 @@ The frontend (`frontend/`) is a Next.js 14 App Router app that consumes the back
 
 ### Key Data Flows
 
-**Form → Backend**: `IntakeModal` (three-way mode toggle: Classic/Quick/Advanced) → mapper → `POST /api/pipeline/start` → `run_id`. Classic uses `mapFormToCustomerConfig()`; Quick and Advanced use `mapFormToDDC()` / direct structured DDC. DDC payloads carry `schema_version: "ddc-v1"` and are discriminated at the API layer.
+**Form → Backend**: `IntakeModal` (two-way toggle: Quick/Advanced) → mapper → `POST /api/pipeline/start` → `run_id`. Quick uses `mapFreeTextToDDC()`; Advanced uses `mapFormToDDC()`. Both produce a `CustomerConfigV2` payload with `schema_version: "ddc-v1"`.
 
 **SSE → UI state**: `lib/api/sse.ts` wraps `@microsoft/fetch-event-source` (not native `EventSource` — needed for proper connection lifecycle). `lib/hooks/use-pipeline.ts` runs a `useReducer` that dedupes events by `event_id`, maps each `EventType` to a `ConsoleEntry`, and derives `OrbitPhase` from the stream. URL param `?run={id}` enables refresh-safe replay — on mount the hook opens SSE against the existing run; the backend replays all stored events; the reducer dedupes.
 
@@ -224,16 +284,16 @@ frontend/
       center-panel.tsx        foreignObject + AnimatePresence crossfade on phase change
     console/entries/          10 entry-type components (agent-start → summary)
     intake-modal/
-      sections/               Classic: 7 legacy sections; DDC: free-text.tsx, actors.tsx, entities.tsx, relationships.tsx, rules.tsx, use-cases.tsx
+      sections/               free-text.tsx (Quick mode), actors.tsx, entities.tsx, relationships.tsx, rules.tsx, use-cases.tsx (Advanced mode)
       widgets/                SegmentedToggle, MultiSelectChips, TagInput, ColorPicker, FeatureList
     top-bar/                  StatusPill, StatusStrip
     output-viewer/            (Phase 5) file tree + content drawer
     ui/                       shadcn-generated primitives
   lib/
     types/ui.ts               OrbitPhase, ConsoleEntry union, PipelineState
-    schemas/intake-form.ts    IntakeFormValues (legacy) + FreeTextFormValues (DDC quick mode)
+    schemas/intake-form.ts    FreeTextFormValues (Quick mode)
     schemas/ddc.ts            Zod v4 mirror of CustomerConfigV2 with all 8 sub-schemas
-    mappers/config.ts         mapFormToDDC() (DDC) + mapFormToCustomerConfig() (legacy, until C15)
+    mappers/config.ts         mapFormToDDC() (Advanced mode → CustomerConfigV2)
     mappers/free-text.ts      mapFreeTextToDDC() — builds minimal DDC from free-text form
     mappers/events.ts         (Phase 3) PipelineEvent → ConsoleEntry
     mappers/phase.ts          (Phase 3) event stream → OrbitPhase
@@ -295,7 +355,7 @@ def test_my_agent(mock_anthropic, make_mock_response):
 
 **Capturing events** — `captured_events` fixture returns `(events_list, emit_callback)`. Pass the callback as `emit_event` to `agent.execute()`.
 
-**Customer config fixtures** — `valid_customer_config` and `valid_finalized_config` provide minimal valid instances for testing.
+**DDC fixture** — `ddc_ecommerce` provides a complete `CustomerConfigV2` from `backend/tests/fixtures/ddc_ecommerce.json` for testing.
 
 **Database tests** — Use in-memory SQLite (`:memory:`) via `init_db(":memory:")`. Call `close_db()` in teardown.
 
