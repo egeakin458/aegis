@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     output_dir: str = "outputs"  # Where generated code projects are saved
 
     # Build checker
-    enable_full_build_check: bool = False
+    enable_full_build_check: bool = True
     full_build_timeout_seconds: int = 90
     build_check_node_path: str = "node"
     build_sandbox_dir: str = "build_sandbox"  # path is relative to backend/ (cwd of uvicorn)

@@ -195,7 +195,8 @@ class TestValidMinimalApp:
 
 class TestFullBuildPath:
     @pytest.mark.asyncio
-    async def test_full_build_not_attempted_when_disabled(self):
+    async def test_full_build_not_attempted_when_disabled(self, monkeypatch):
+        monkeypatch.setattr("app.config.settings.enable_full_build_check", False)
         with patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])):
             result = await run_build_check(_make_code_output(_minimal_valid_files()))
         assert result.full_build_attempted is False
