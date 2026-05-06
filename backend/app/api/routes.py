@@ -54,6 +54,7 @@ async def start_pipeline(body: dict[str, Any] = Body(...)):
     try:
         config = CustomerConfigV2(**body)
     except ValidationError as exc:
+        logger.warning("Pipeline start rejected — validation errors: %s", exc.errors())
         raise HTTPException(status_code=422, detail=exc.errors())
     run_id = await runner_manager.start_run(config)
     return {"run_id": run_id, "status": "started"}

@@ -51,11 +51,13 @@ class BaseAgent:
         system_prompt: str,
         output_schema: Type[BaseModel],
         model: str | None = None,
+        max_tokens: int | None = None,
     ):
         self.name = name
         self.system_prompt = system_prompt
         self.output_schema = output_schema
         self.model = model or settings.primary_model
+        self.max_tokens = max_tokens or settings.max_tokens
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     def build_user_prompt(self, context: dict[str, Any]) -> str:
@@ -180,7 +182,7 @@ class BaseAgent:
             try:
                 response = await self.client.messages.create(
                     model=self.model,
-                    max_tokens=settings.max_tokens,
+                    max_tokens=self.max_tokens,
                     timeout=settings.api_timeout,
                     system=[{
                         "type": "text",
