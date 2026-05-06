@@ -97,13 +97,30 @@ class RunnerManager:
         if (
             runner.current_run
             and runner.current_run.state == PipelineState.COMPLETE
-            and runner.current_run.outcome in ("success", "partial")
-            and "code_output" in runner.context
         ):
-            try:
-                await save_output(runner.current_run.run_id, runner.context["code_output"])
-            except (OSError, ValueError) as e:
-                logger.error("Failed to save output for run %s: %s", entry.run_id, e)
+            # Save generated files before emitting the terminal event so that
+            # clients hitting GET /output immediately after the SSE event find
+            # the manifest on disk. save_output is conditional on code_output
+            # existing; the terminal event fires regardless.
+            if runner.current_run.outcome in ("success", "partial") and "code_output" in runner.context:
+                try:
+                    await save_output(runner.current_run.run_id, runner.context["code_output"])
+                except (OSError, ValueError) as e:
+                    logger.error("Failed to save output for run %s: %s", entry.run_id, e)
+
+            outcome = runner.current_run.outcome
+            if outcome == "partial":
+                msg = "We built as much as we could within review cycles. Here's what was completed."
+                event_type = EventType.PIPELINE_PARTIAL
+            else:
+                msg = "Your application is ready! Here's what we built."
+                event_type = EventType.PIPELINE_COMPLETE
+            runner.emit_event(PipelineEvent(
+                run_id=runner.current_run.run_id,
+                agent=AgentName.SYSTEM,
+                event_type=event_type,
+                message=msg,
+            ))
 
     async def start_run(self, config: CustomerConfigV2) -> str:
         """

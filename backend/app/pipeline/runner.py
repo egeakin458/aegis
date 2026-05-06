@@ -176,21 +176,10 @@ class PipelineRunner:
         if state == PipelineState.COMPLETE:
             self._transition(PipelineState.COMPLETE)
             self.current_run.completed_at = datetime.now(timezone.utc)
-            if self.current_run.outcome == "partial":
-                self.emit_event(PipelineEvent(
-                    run_id=self.current_run.run_id,
-                    agent=AgentName.SYSTEM,
-                    event_type=EventType.PIPELINE_PARTIAL,
-                    message="We built as much as we could within review cycles. Here's what was completed.",
-                ))
-            else:
+            if self.current_run.outcome != "partial":
                 self.current_run.outcome = "success"
-                self.emit_event(PipelineEvent(
-                    run_id=self.current_run.run_id,
-                    agent=AgentName.SYSTEM,
-                    event_type=EventType.PIPELINE_COMPLETE,
-                    message="Your application is ready! Here's what we built.",
-                ))
+            # Terminal SSE event is emitted by RunnerManager._finalize_run() AFTER
+            # save_output() completes, so clients can safely fetch /output immediately.
         elif state == PipelineState.CLARIFICATION:
             self._transition(PipelineState.CLARIFICATION)
             # Pipeline pauses — will be resumed via resume()
