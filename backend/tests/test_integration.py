@@ -221,12 +221,16 @@ class TestDDCFullPipelineIntegration:
         assert result.outcome == "success"
 
     @pytest.mark.asyncio
-    async def test_pipeline_emits_terminal_event(self, ddc_ecommerce):
+    async def test_pipeline_runner_does_not_emit_terminal_event(self, ddc_ecommerce):
+        # PIPELINE_COMPLETE is emitted by RunnerManager._finalize_run() after
+        # save_output() completes, so clients can safely fetch /output immediately.
+        # The runner itself must NOT emit it to avoid the race condition.
         ddc_dict = ddc_ecommerce.model_dump(mode="json")
         runner, events = _build_pipeline_with_mocked_llm(ddc_dict)
         await runner.run(ddc_ecommerce)
         event_types = [e.event_type for e in events]
-        assert EventType.PIPELINE_COMPLETE in event_types
+        assert EventType.PIPELINE_COMPLETE not in event_types
+        assert runner.current_run.state == PipelineState.COMPLETE
 
     @pytest.mark.asyncio
     async def test_pipeline_emits_pipeline_started_first(self, ddc_ecommerce):

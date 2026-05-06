@@ -1,0 +1,15 @@
+{
+  "name": "aegis-build-sandbox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pre-seeded dependency sandbox used by build_checker.py to verify generated Aegis apps. Do not deploy.",
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "better-sqlite3": "11.1.2",
+    "tailwindcss": "3.4.10",
+    "postcss": "8.4.41",
+    "autoprefixer": "10.4.20"
+  }
+}

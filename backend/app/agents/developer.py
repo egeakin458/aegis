@@ -125,6 +125,7 @@ class Developer(BaseAgent):
             name=AgentName.DEVELOPER,
             system_prompt=DDC_SYSTEM_PROMPT,
             output_schema=CodeOutput,
+            max_tokens=16384,
         )
 
     def _select_output_schema(self, context: dict[str, Any]) -> Type[BaseModel]:

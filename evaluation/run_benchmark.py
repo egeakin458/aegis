@@ -139,6 +139,10 @@ def main():
     print(f"Submitting {config_type} to pipeline...")
     try:
         resp = post_json("/api/pipeline/start", config)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print(f"❌  Backend rejected payload ({e.code}): {body}")
+        sys.exit(1)
     except urllib.error.URLError as e:
         print(f"❌  Cannot reach backend at {BASE_URL}: {e}")
         sys.exit(1)

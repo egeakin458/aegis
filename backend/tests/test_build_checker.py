@@ -201,15 +201,89 @@ class TestFullBuildPath:
         assert result.full_build_attempted is False
 
     @pytest.mark.asyncio
-    async def test_full_build_attempted_when_enabled(self):
+    async def test_full_build_attempted_when_enabled(self, tmp_path, monkeypatch):
+        # Create a minimal fake sandbox so _run_full_build sees node_modules and proceeds.
+        fake_sandbox = tmp_path / "sandbox"
+        (fake_sandbox / "node_modules").mkdir(parents=True)
+        (fake_sandbox / "package.json").write_text("{}")
+        (fake_sandbox / "next.config.js").write_text("module.exports = {};")
+        monkeypatch.setattr("app.config.settings.build_sandbox_dir", str(fake_sandbox))
+        monkeypatch.setattr("app.config.settings.enable_full_build_check", True)
+
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b"Build OK\n", b""))
 
+        async def _fake_exec(*args, **kwargs):
+            # node --check (lightweight) returns success; npx next build returns success.
+            return mock_proc
+
         with (
-            patch("app.config.settings.enable_full_build_check", True),
             patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])),
-            patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)),
+            patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=_fake_exec)),
         ):
-            result = await run_build_check(_make_code_output(_minimal_valid_files()))
+            result = await run_build_check(
+                _make_code_output(_minimal_valid_files()),
+                run_id="test-run-1",
+            )
         assert result.full_build_attempted is True
+
+    @pytest.mark.asyncio
+    async def test_sandbox_missing_fails_loud(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("app.config.settings.build_sandbox_dir", str(tmp_path / "no-sandbox"))
+        monkeypatch.setattr("app.config.settings.enable_full_build_check", True)
+
+        with patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])):
+            result = await run_build_check(
+                _make_code_output(_minimal_valid_files()),
+                run_id="test-run-2",
+            )
+        sandbox_issues = [i for i in result.issues if i.check == "sandbox_missing"]
+        assert len(sandbox_issues) == 1
+        assert "setup_build_sandbox.sh" in sandbox_issues[0].message
+
+
+class TestDepDrift:
+    @pytest.mark.asyncio
+    async def test_extra_dep_flagged(self):
+        files = _minimal_valid_files()
+        for f in files:
+            if f["path"] == "package.json":
+                pkg = json.loads(f["content"])
+                pkg["dependencies"]["lodash"] = "4.17.0"  # NOT in allowlist
+                f["content"] = json.dumps(pkg)
+        with patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])):
+            result = await run_build_check(_make_code_output(files))
+        drift = [i for i in result.issues if i.check == "dep_drift"]
+        assert len(drift) == 1
+        assert "lodash" in drift[0].message
+
+    @pytest.mark.asyncio
+    async def test_only_allowed_deps_no_drift(self):
+        with patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])):
+            result = await run_build_check(_make_code_output(_minimal_valid_files()))
+        drift = [i for i in result.issues if i.check == "dep_drift"]
+        assert drift == []
+
+
+class TestHardlinkTree:
+    def test_skips_cache_and_preserves_symlinks(self, tmp_path):
+        from app.pipeline.build_checker import _hardlink_tree
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "regular.js").write_text("hello")
+        (src / ".cache").mkdir()
+        (src / ".cache" / "ignore.me").write_text("nope")
+        (src / "subdir").mkdir()
+        (src / "subdir" / "real.js").write_text("real")
+        (src / "alias.js").symlink_to("subdir/real.js")
+
+        dst = tmp_path / "dst"
+        _hardlink_tree(src, dst)
+
+        assert (dst / "regular.js").read_text() == "hello"
+        assert not (dst / ".cache").exists()
+        assert (dst / "alias.js").is_symlink()
+        assert (dst / "subdir" / "real.js").read_text() == "real"
+        # Hardlink check: same inode as source for a regular file
+        assert (dst / "regular.js").stat().st_ino == (src / "regular.js").stat().st_ino

@@ -219,7 +219,7 @@ class BuildCheckIssue(BaseModel):
     column: Optional[int] = Field(None, description="Column number of the issue, if applicable")
     severity: Literal["error", "warning"] = Field(..., description="error | warning")
     message: str = Field(..., description="Human-readable issue description")
-    check: Literal["syntax_js", "json_parse", "missing_required_file", "next_build"] = Field(
+    check: Literal["syntax_js", "json_parse", "missing_required_file", "next_build", "dep_drift", "sandbox_missing"] = Field(
         ..., description="Which check detected this issue"
     )
 

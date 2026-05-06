@@ -46,10 +46,10 @@
     "relationships": [
       {
         "id": "rel_task2cat",
-        "from_entity_id": "ent_task0001",
-        "to_entity_id": "ent_cat00001",
-        "kind": "many_to_one",
-        "name": "belongs_to_category"
+        "from_entity_id": "ent_cat00001",
+        "to_entity_id": "ent_task0001",
+        "kind": "one_to_many",
+        "name": "tasks"
       }
     ],
     "business_rules": [],
