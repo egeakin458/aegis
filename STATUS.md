@@ -26,7 +26,7 @@ Full codebase audit performed. Findings ranked by impact × urgency.
 
 1. **~~CORS broken~~** — **DONE** (`app/main.py`). `allow_origin_regex` now covers all `*.vercel.app` subdomains; `ALLOWED_ORIGIN` env var allows a custom production domain.
 2. **~~No API auth on `POST /start`~~** — **DONE** (`app/api/auth.py`). Bearer token enforced on all `/api/pipeline` routes; disabled when `API_KEY=""` (dev mode).
-3. **Build sandbox leaks `ANTHROPIC_API_KEY`** — `_run_full_build` passes `**os.environ` to the `next build` subprocess (`build_checker.py:259`). Developer-generated JS runs with the API key in scope. A DDC prompt injection can exfiltrate it. Scrub env to a minimal allowlist.
+3. **~~Build sandbox leaks `ANTHROPIC_API_KEY`~~** — **DONE** (`app/pipeline/build_checker.py`). `_run_full_build` now passes an explicit env allowlist (PATH, HOME, NODE_ENV, CI, NEXT_TELEMETRY_DISABLED, plus optional TMPDIR/TEMP/TMP/NODE_PATH/npm_config_cache) to `next build`. `**os.environ` is no longer spread, so Developer-generated JS cannot read server secrets via `process.env`.
 4. **SQLite on ephemeral Railway filesystem** — `aegis.db` and `backend/outputs/` disappear on every redeploy. Need a Railway Volume mount; set `DATABASE_PATH` and `OUTPUT_DIR` to the volume path.
 5. **`_sanitize_path` prefix-collision bug** (`output_storage.py:23`) — `startswith` check is bypassable if `output_dir` is a prefix of another path (e.g., `/data/out` passes for `/data/output_attacker/...`). Fix: use `Path.resolve().is_relative_to(base)`.
 
@@ -36,7 +36,7 @@ Full codebase audit performed. Findings ranked by impact × urgency.
 |---|------|---------|--------|
 | 1 | Add API key auth on `POST /start` and SSE endpoints | `routes.py`, `config.py` | ✓ |
 | 2 | Fix CORS regex | `main.py` | ✓ |
-| 3 | Scrub subprocess env in `_run_full_build` | `build_checker.py` | ☐ |
+| 3 | Scrub subprocess env in `_run_full_build` | `build_checker.py` | ✓ |
 | 4 | Wire `BUILD_CHECK` result into QA Reviewer context | `runner.py`, `qa_reviewer.py` | ☐ |
 | 5 | Persistent storage on Railway (Volume mount for SQLite + outputs) | `config.py`, deploy config | ☐ |
 | 6 | Top-level pipeline timeout (`asyncio.wait_for`) | `runner.py` | ☐ |
