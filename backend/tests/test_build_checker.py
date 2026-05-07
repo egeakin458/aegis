@@ -243,6 +243,59 @@ class TestFullBuildPath:
         assert len(sandbox_issues) == 1
         assert "setup_build_sandbox.sh" in sandbox_issues[0].message
 
+    @pytest.mark.asyncio
+    async def test_full_build_subprocess_env_is_scrubbed(self, tmp_path, monkeypatch):
+        """Secrets in os.environ must NOT leak into the `next build` subprocess env."""
+        # Inject a fake secret into the parent process env.
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret-leaked")
+        monkeypatch.setenv("API_KEY", "server-api-key-leaked")
+        monkeypatch.setenv("DATABASE_PATH", "/tmp/should-not-leak.db")
+
+        # Minimal fake sandbox so _run_full_build proceeds past the sandbox check.
+        fake_sandbox = tmp_path / "sandbox"
+        (fake_sandbox / "node_modules").mkdir(parents=True)
+        (fake_sandbox / "package.json").write_text("{}")
+        (fake_sandbox / "next.config.js").write_text("module.exports = {};")
+        monkeypatch.setattr("app.config.settings.build_sandbox_dir", str(fake_sandbox))
+        monkeypatch.setattr("app.config.settings.enable_full_build_check", True)
+
+        captured_envs: list[dict] = []
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(b"Build OK\n", b""))
+
+        async def _fake_exec(*args, **kwargs):
+            captured_envs.append(kwargs.get("env"))
+            return mock_proc
+
+        with (
+            patch("app.pipeline.build_checker._check_js_syntax", new=AsyncMock(return_value=[])),
+            patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=_fake_exec)),
+        ):
+            result = await run_build_check(
+                _make_code_output(_minimal_valid_files()),
+                run_id="test-run-scrub",
+            )
+
+        assert result.full_build_attempted is True
+        # The full-build subprocess is the one whose env contains NODE_ENV=production.
+        build_envs = [e for e in captured_envs if e and e.get("NODE_ENV") == "production"]
+        assert len(build_envs) == 1, f"Expected one full-build subprocess, got envs: {captured_envs}"
+        env = build_envs[0]
+
+        # Secrets MUST be absent.
+        assert "ANTHROPIC_API_KEY" not in env, "ANTHROPIC_API_KEY leaked into next build subprocess"
+        assert "API_KEY" not in env, "API_KEY leaked into next build subprocess"
+        assert "DATABASE_PATH" not in env, "DATABASE_PATH leaked into next build subprocess"
+
+        # Required keys MUST be present.
+        assert "PATH" in env, "PATH must be passed through so npx/node are findable"
+        assert env.get("NODE_ENV") == "production"
+        assert env.get("CI") == "1"
+        assert env.get("NEXT_TELEMETRY_DISABLED") == "1"
+        assert env.get("HOME", "").endswith("test-run-scrub")
+
 
 class TestDepDrift:
     @pytest.mark.asyncio
