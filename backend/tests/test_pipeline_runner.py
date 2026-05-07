@@ -407,6 +407,16 @@ class TestDDCPipeline:
         assert "code_output" in qa_context
         assert "finalized_config" not in qa_context
 
+    async def test_ddc_qa_receives_build_check_result(self, ddc_ecommerce):
+        events: list[PipelineEvent] = []
+        agents = _agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        qa_context = agents["qa_reviewer"].execute.call_args[0][0]
+        assert "build_check_result" in qa_context
+        assert qa_context["build_check_result"] is not None
+        assert qa_context["build_check_result"].passed is True
+
     async def test_ddc_code_revision_context_includes_customer_config_v2(self, ddc_ecommerce):
         """On code revision, Developer must still receive customer_config_v2."""
         events: list[PipelineEvent] = []

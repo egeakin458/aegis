@@ -30,6 +30,8 @@ from app.schemas.agent_outputs import (
     CodeOutput,
     CodeFile,
     FeatureImplementation,
+    BuildCheckResult,
+    BuildCheckIssue,
 )
 from app.schemas.customer_config import CustomerConfigV2
 from app.schemas.pipeline_events import EventType
@@ -221,6 +223,52 @@ class TestDDCQASync:
         })
         assert "CUSTOMER REQUIREMENTS" not in prompt
         assert "use_case.id" in prompt
+
+    def test_ddc_user_prompt_includes_build_check_when_present(
+        self, ddc_ecommerce: CustomerConfigV2
+    ):
+        agent = self._make_agent()
+        design = _make_technical_design_from_ddc(ddc_ecommerce)
+        code = _make_code_output(ddc_ecommerce)
+        build_check = BuildCheckResult(
+            passed=False,
+            duration_ms=42,
+            files_checked=5,
+            issues=[
+                BuildCheckIssue(
+                    file="app/api/orders/route.js",
+                    line=12,
+                    column=3,
+                    severity="error",
+                    message="Unexpected token '}'",
+                    check="syntax_js",
+                )
+            ],
+            full_build_attempted=True,
+            full_build_log=None,
+        )
+        prompt = agent.build_user_prompt({
+            "customer_config_v2": ddc_ecommerce,
+            "technical_design": design,
+            "code_output": code,
+            "build_check_result": build_check,
+        })
+        assert "BUILD CHECK RESULT" in prompt
+        assert "syntax_js" in prompt
+        assert "app/api/orders/route.js" in prompt
+
+    def test_ddc_user_prompt_omits_build_check_when_absent(
+        self, ddc_ecommerce: CustomerConfigV2
+    ):
+        agent = self._make_agent()
+        design = _make_technical_design_from_ddc(ddc_ecommerce)
+        code = _make_code_output(ddc_ecommerce)
+        prompt = agent.build_user_prompt({
+            "customer_config_v2": ddc_ecommerce,
+            "technical_design": design,
+            "code_output": code,
+        })
+        assert "BUILD CHECK RESULT" not in prompt
 
 
 # ---------------------------------------------------------------------------
