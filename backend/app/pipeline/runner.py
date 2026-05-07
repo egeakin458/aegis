@@ -336,6 +336,7 @@ class PipelineRunner:
             "customer_config_v2": self.context["customer_config_v2"],
             "technical_design": self.context["technical_design"],
             "code_output": self.context["code_output"],
+            "build_check_result": self.context.get("build_check_result"),
         }
 
         result = await qa.execute(
