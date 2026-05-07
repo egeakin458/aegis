@@ -74,10 +74,13 @@ Step 5 — CODE QUALITY
 - No hardcoded secrets, no SQL injection vectors
 - "use client" only where interactivity is needed
 
-Step 6 — VERDICT AND SCORE
+Step 6 — BUILD CHECK INCORPORATION
+If a BUILD CHECK RESULT section is present in the input, treat its issues as authoritative evidence about the code's correctness. For every build issue with severity "error", create a corresponding entry in your `issues` list (severity "critical" if it prevents the app from building, otherwise "major") that cites the file and the build check's `check` name. If the build check did not pass (`passed: false` or any error-severity issue), the verdict MUST be at least "revise_code" — you cannot return "approve" while build errors exist.
+
+Step 7 — VERDICT AND SCORE
 Score 1-5 (see criteria below). Verdict rules:
-- All use cases covered + all critical rules enforced + score >= 3 → "approve"
-- Any use case missing OR any critical rule not enforced OR score < 3 → "revise_code"
+- All use cases covered + all critical rules enforced + build check passed + score >= 3 → "approve"
+- Any use case missing OR any critical rule not enforced OR build check failed OR score < 3 → "revise_code"
 - Missing data models or fundamentally wrong API structure → "revise_design" (rare)
 
 Score criteria:
@@ -87,7 +90,7 @@ Score criteria:
 - 2: Missing use cases or unenfored critical rules.
 - 1: Major features missing or broken code.
 
-Step 7 — SUMMARY
+Step 8 — SUMMARY
 Write in plain business language for the customer. Mention which capabilities work, which don't, and what will be fixed.
 
 CONSTRAINTS
@@ -149,6 +152,7 @@ class QAReviewer(BaseAgent):
         ddc = context["customer_config_v2"]
         technical_design = context["technical_design"]
         code_output = context["code_output"]
+        build_check_result = context.get("build_check_result")
 
         ddc_json = json.dumps(
             ddc.model_dump(mode="json") if hasattr(ddc, "model_dump") else ddc,
@@ -157,7 +161,7 @@ class QAReviewer(BaseAgent):
         design_json = json.dumps(technical_design.model_dump(mode="json"), indent=2)
         code_json = json.dumps(code_output.model_dump(mode="json"), indent=2)
 
-        return (
+        prompt = (
             f"REVIEW THE IMPLEMENTATION\n\n"
             f"Apply all mandatory DDC review steps. "
             f"requirements_coverage must have one entry per use_case keyed by use_case.id. "
@@ -166,3 +170,17 @@ class QAReviewer(BaseAgent):
             f"TECHNICAL DESIGN:\n{design_json}\n\n"
             f"CODE IMPLEMENTATION:\n{code_json}"
         )
+
+        if build_check_result is not None:
+            bc_json = json.dumps(
+                build_check_result.model_dump(mode="json"),
+                indent=2,
+            )
+            header = (
+                "BUILD CHECK RESULT (FAILED — review these issues):"
+                if not build_check_result.passed
+                else "BUILD CHECK RESULT (passed):"
+            )
+            prompt += f"\n\n{header}\n{bc_json}"
+
+        return prompt
