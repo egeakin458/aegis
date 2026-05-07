@@ -28,7 +28,9 @@ def mock_db():
         patch("app.main.init_db", new_callable=AsyncMock),
         patch("app.main.close_db", new_callable=AsyncMock),
         patch("app.main.settings"),
+        patch("app.api.auth.settings") as mock_auth_settings,
     ):
+        mock_auth_settings.api_key = ""
         yield
 
 
