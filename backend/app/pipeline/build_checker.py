@@ -254,14 +254,21 @@ async def _run_full_build(code_output: CodeOutput, run_id: str) -> tuple[str, li
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(code_file.content, encoding="utf-8")
 
-        # Subprocess env: production, no telemetry, contained HOME
-        env = {
-            **os.environ,
+        # Subprocess env: explicit allowlist only.
+        # NEVER spread os.environ here — the Developer agent's JS runs inside
+        # `next build` and any var present would be readable via process.env,
+        # creating an exfiltration path for ANTHROPIC_API_KEY and other secrets.
+        env: dict[str, str] = {
+            "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            "HOME": str(workdir),
             "NODE_ENV": "production",
             "CI": "1",
             "NEXT_TELEMETRY_DISABLED": "1",
-            "HOME": str(workdir),
         }
+        for optional_key in ("TMPDIR", "TEMP", "TMP", "NODE_PATH", "npm_config_cache"):
+            value = os.environ.get(optional_key)
+            if value is not None:
+                env[optional_key] = value
         try:
             proc = await asyncio.create_subprocess_exec(
                 "npx", "next", "build",
