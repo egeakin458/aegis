@@ -37,7 +37,7 @@ Full codebase audit performed. Findings ranked by impact × urgency.
 | 1 | Add API key auth on `POST /start` and SSE endpoints | `routes.py`, `config.py` | ✓ |
 | 2 | Fix CORS regex | `main.py` | ✓ |
 | 3 | Scrub subprocess env in `_run_full_build` | `build_checker.py` | ✓ |
-| 4 | Wire `BUILD_CHECK` result into QA Reviewer context | `runner.py`, `qa_reviewer.py` | ☐ |
+| 4 | Wire `BUILD_CHECK` result into QA Reviewer context | `runner.py`, `qa_reviewer.py` | ✓ |
 | 5 | Persistent storage on Railway (Volume mount for SQLite + outputs) | `config.py`, deploy config | ☐ |
 | 6 | Top-level pipeline timeout (`asyncio.wait_for`) | `runner.py` | ☐ |
 | 7 | Tighten Developer prompt: PATCH routing + concrete code examples | `developer.py` | ☐ |
