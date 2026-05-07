@@ -15,11 +15,12 @@ import zipfile
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sse_starlette.sse import EventSourceResponse
 
+from app.api.auth import require_api_key
 from app.config import settings
 from app.db import repositories as repo
 from app.pipeline.manager import runner_manager
@@ -28,7 +29,7 @@ from app.schemas.pipeline_events import EventType, PipelineState
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 # Terminal event types that signal the SSE stream should close
 _TERMINAL_EVENTS = {
