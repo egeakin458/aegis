@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # API security
     api_key: str = ""  # Shared secret for frontend-backend auth
+    allowed_origin: str = ""  # Optional explicit production domain for CORS (e.g. https://aegis.example.com)
 
     # Database
     database_path: str = "aegis.db"
