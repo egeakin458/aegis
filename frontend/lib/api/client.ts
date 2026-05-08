@@ -3,9 +3,22 @@ import type { CustomerConfig, StartRunResponse, OutputManifest } from '@/lib/typ
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const API = `${BASE_URL}/api/pipeline`
 
+export function getApiKey(): string {
+  return process.env.NEXT_PUBLIC_API_KEY ?? ''
+}
+
+export function authHeaders(): Record<string, string> {
+  const key = getApiKey()
+  return key ? { Authorization: `Bearer ${key}` } : {}
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...init?.headers,
+    },
     ...init,
   })
   if (!res.ok) {

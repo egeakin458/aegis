@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { X, Download, ChevronRight, ChevronDown, FileCode } from 'lucide-react'
 import type { OutputManifest, OutputFile } from '@/lib/types/api'
+import { authHeaders } from '@/lib/api/client'
 
 interface Props {
   manifest: OutputManifest | null
@@ -75,11 +76,39 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 export function OutputViewer({ manifest, runId, open, onClose }: Props) {
   const [selectedFile, setSelectedFile] = useState<OutputFile | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
   if (!open) return null
 
   const tree = manifest ? buildTree(manifest.files) : null
-  const downloadUrl = runId ? `${BASE_URL}/api/pipeline/${runId}/output/download` : '#'
+
+  async function handleDownload() {
+    if (!runId || downloading) return
+    setDownloading(true)
+    try {
+      const res = await fetch(`${BASE_URL}/api/pipeline/${runId}/output/download`, {
+        headers: authHeaders(),
+      })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`${res.status} ${res.statusText}${body ? ': ' + body : ''}`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `aegis-${runId}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Download failed:', err)
+      alert(`Download failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -92,14 +121,14 @@ export function OutputViewer({ manifest, runId, open, onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
           <span className="text-sm font-semibold text-slate-200">Generated Files</span>
           <div className="flex items-center gap-2">
-            <a
-              href={downloadUrl}
-              download
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors"
+            <button
+              onClick={handleDownload}
+              disabled={!runId || downloading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={13} />
-              Download ZIP
-            </a>
+              {downloading ? 'Downloading...' : 'Download ZIP'}
+            </button>
             <button onClick={onClose} className="p-1 text-slate-500 hover:text-slate-300">
               <X size={16} />
             </button>
