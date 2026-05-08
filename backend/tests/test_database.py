@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -677,3 +678,21 @@ class TestMultipleEventsPerRun:
         rows = await get_events(minimal_pipeline_run.run_id)
         event_ids = [r["event_id"] for r in rows]
         assert len(event_ids) == len(set(event_ids))
+
+
+@pytest.mark.asyncio
+async def test_init_db_creates_parent_directory(tmp_path):
+    """init_db must create the parent directory if it does not exist.
+
+    This is the Railway Volume case: on a fresh volume mount at /data,
+    the directory exists but on first boot we may target a nested path
+    that does not. The function must create it rather than crash with
+    sqlite3.OperationalError.
+    """
+    path = str(tmp_path / "subdir" / "aegis.db")
+    assert not Path(path).parent.exists()
+    try:
+        await init_db(path)
+        assert Path(path).exists()
+    finally:
+        await close_db()
