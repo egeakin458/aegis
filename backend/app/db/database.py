@@ -57,6 +57,7 @@ async def init_db(db_path: str | None = None) -> None:
         await _connection.close()
     path = db_path or settings.database_path
     logger.info("Initializing database at %s", path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     _connection = await aiosqlite.connect(path)
     _connection.row_factory = aiosqlite.Row
     await _connection.executescript(SCHEMA_SQL)
