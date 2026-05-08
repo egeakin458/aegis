@@ -123,7 +123,7 @@ Next.js 14 App Router app consuming the backend SSE stream. Located in `frontend
 | Frontend | Next.js 14 + Tailwind CSS + shadcn/ui |
 | Database | SQLite via aiosqlite (async) — no ORM |
 | Validation | Pydantic v2 |
-| Deployment | Railway (backend) + Vercel (frontend) |
+| Deployment | Local (`uvicorn` + `npm run dev`) for demo; Railway + Vercel available but currently offline |
 
 **Generated apps** always use: Next.js 14 App Router + Tailwind CSS + better-sqlite3 + JavaScript. Enforced in agent system prompts — agents must NOT choose alternatives.
 
@@ -137,7 +137,7 @@ Next.js 14 App Router app consuming the backend SSE stream. Located in `frontend
 
 ## Configuration
 
-All settings in `backend/app/config.py` via `pydantic-settings`, loaded from `.env`. Read the source for the authoritative list. Required: `ANTHROPIC_API_KEY`. Notable flags: `enable_full_build_check` (default `False`), `max_code_revision_cycles=2`, `max_design_revision_cycles=1`, `max_clarification_rounds=3`.
+All settings in `backend/app/config.py` via `pydantic-settings`, loaded from `.env`. Read the source for the authoritative list. Required: `ANTHROPIC_API_KEY`. Notable flags: `enable_full_build_check` (default `True` — flipped on `main` @ `07bb3b2`), `max_code_revision_cycles=2`, `max_design_revision_cycles=1`, `max_clarification_rounds=3`.
 
 ## Development
 

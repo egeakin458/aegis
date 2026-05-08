@@ -21,7 +21,7 @@ Live project state. Update when work moves.
 | # | Item | File(s) | Status |
 |---|------|---------|--------|
 | 6 | Top-level pipeline timeout (`asyncio.wait_for`) | `runner.py` | ☐ |
-| 9 | Startup sweep — mark in-flight DB runs as FAILED on restart | `manager.py` / `main.py` | ☐ |
+| 9 | Startup sweep — mark in-flight DB runs as FAILED on restart | `manager.py` / `main.py` | ☐ (only matters if redeploying to Railway) |
 | 7 | Tighten Developer prompt: PATCH routing + concrete examples | `developer.py` | ☐ |
 | 8 | Post-validate QA verdict consistency | `runner.py`, `agent_outputs.py` | ☐ |
 | 10 | Fix `_sanitize_path` with `Path.is_relative_to()` | `output_storage.py` | ☐ |
