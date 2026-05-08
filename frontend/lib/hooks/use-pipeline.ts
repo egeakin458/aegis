@@ -6,7 +6,8 @@ import { startPipeline, submitClarification as apiSubmitClarification, getOutput
 import { mapEventToEntry } from '@/lib/mappers/events'
 import { derivePhase } from '@/lib/mappers/phase'
 import type { SSEHandle } from '@/lib/api/sse'
-import type { PipelineEvent, CustomerConfig, OutputManifest } from '@/lib/types/api'
+import type { PipelineEvent, OutputManifest } from '@/lib/types/api'
+import type { CustomerConfigV2 } from '@/lib/schemas/ddc'
 import type { OrbitPhase, ConsoleEntry, ConnectionState } from '@/lib/types/ui'
 
 interface State {
@@ -169,7 +170,7 @@ export function usePipeline() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const startRun = useCallback(async (config: CustomerConfig) => {
+  const startRun = useCallback(async (config: CustomerConfigV2) => {
     try {
       const { run_id } = await startPipeline(config)
       runIdRef.current = run_id

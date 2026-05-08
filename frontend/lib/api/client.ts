@@ -1,4 +1,5 @@
-import type { CustomerConfig, StartRunResponse, OutputManifest } from '@/lib/types/api'
+import type { StartRunResponse, OutputManifest } from '@/lib/types/api'
+import type { CustomerConfigV2 } from '@/lib/schemas/ddc'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const API = `${BASE_URL}/api/pipeline`
@@ -28,7 +29,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export const startPipeline = (config: CustomerConfig): Promise<StartRunResponse> =>
+export const startPipeline = (config: CustomerConfigV2): Promise<StartRunResponse> =>
   apiFetch('/start', { method: 'POST', body: JSON.stringify(config) })
 
 export const submitClarification = (runId: string, answers: Record<string, string>): Promise<{ status: string }> =>
