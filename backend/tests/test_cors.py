@@ -3,7 +3,7 @@ CORS preflight tests.
 
 Verifies that:
 - localhost:3000 (dev frontend) is allowed
-- arbitrary *.vercel.app subdomains (preview deployments) are allowed
+- arbitrary *.vercel.app subdomains are NOT allowed (no wildcard regex)
 - unknown origins are rejected (no Access-Control-Allow-Origin header)
 - an explicit production domain set via ALLOWED_ORIGIN is allowed
 
@@ -54,19 +54,19 @@ async def test_localhost_origin_allowed():
 
 
 @pytest.mark.asyncio
-async def test_vercel_preview_origin_allowed():
-    """Any *.vercel.app subdomain must pass — this is the currently broken case."""
+async def test_vercel_preview_origin_rejected():
+    """Arbitrary *.vercel.app subdomains must NOT pass — wildcard regex was removed."""
     origin = "https://aegis-pr-42.vercel.app"
     resp = await _preflight(origin)
-    assert resp.headers.get("access-control-allow-origin") == origin
+    assert "access-control-allow-origin" not in {k.lower() for k in resp.headers.keys()}
 
 
 @pytest.mark.asyncio
-async def test_vercel_production_origin_allowed():
-    """The bare production-style Vercel URL must also pass."""
+async def test_vercel_production_origin_rejected_without_env():
+    """Bare *.vercel.app must NOT pass without ALLOWED_ORIGIN set."""
     origin = "https://aegis.vercel.app"
     resp = await _preflight(origin)
-    assert resp.headers.get("access-control-allow-origin") == origin
+    assert "access-control-allow-origin" not in {k.lower() for k in resp.headers.keys()}
 
 
 @pytest.mark.asyncio
