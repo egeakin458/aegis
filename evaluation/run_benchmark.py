@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -17,6 +18,12 @@ import urllib.error
 from pathlib import Path
 
 BASE_URL = "http://localhost:8000"
+API_KEY = os.environ.get("API_KEY", "")
+
+
+def _auth_headers() -> dict:
+    """Return Authorization header if API_KEY is set, otherwise {}."""
+    return {"Authorization": f"Bearer {API_KEY}"} if API_KEY else {}
 
 
 def post_json(path: str, body: dict) -> dict:
@@ -24,7 +31,7 @@ def post_json(path: str, body: dict) -> dict:
     req = urllib.request.Request(
         f"{BASE_URL}{path}",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **_auth_headers()},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -34,7 +41,10 @@ def post_json(path: str, body: dict) -> dict:
 def stream_events(run_id: str):
     """Generator that yields PipelineEvent dicts from the SSE stream."""
     url = f"{BASE_URL}/api/pipeline/{run_id}/events"
-    req = urllib.request.Request(url, headers={"Accept": "text/event-stream"})
+    req = urllib.request.Request(
+        url,
+        headers={"Accept": "text/event-stream", **_auth_headers()},
+    )
     with urllib.request.urlopen(req, timeout=600) as resp:
         for raw_line in resp:
             line = raw_line.decode("utf-8").rstrip("\n")
@@ -49,7 +59,8 @@ def stream_events(run_id: str):
 
 def get_output(run_id: str) -> dict:
     url = f"{BASE_URL}/api/pipeline/{run_id}/output"
-    with urllib.request.urlopen(url, timeout=30) as resp:
+    req = urllib.request.Request(url, headers=_auth_headers())
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
 
 
