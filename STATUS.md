@@ -40,7 +40,7 @@ Expected: `pipeline_complete`, 100% feature/test score, ~4 min wall.
 
 ## Backlog (post-competition)
 
-Top-level pipeline timeout (#6 — bounds worst-case hang at the pipeline level), Developer prompt PATCH tightening (#7), QA verdict consistency (#8), startup sweep (#9), `_sanitize_path` edge case (#10), duplicate `PIPELINE_STARTED` event in SSE replay (cosmetic — to investigate next).
+Top-level pipeline timeout (#6 — bounds worst-case hang at the pipeline level), Developer prompt PATCH tightening (#7), QA verdict consistency (#8), startup sweep (#9), `_sanitize_path` edge case (#10).
 
 ---
 
@@ -48,3 +48,4 @@ Top-level pipeline timeout (#6 — bounds worst-case hang at the pipeline level)
 
 - **2026-05-10** — `api_timeout` 120 s → 600 s. Developer call measured at 111.5 s on a simple DDC; was running with 7 % headroom under the SDK timeout. Now 5×.
 - **2026-05-10** — `evaluation/run_benchmark.py` sends `Authorization: Bearer` header. Was 401-ing against an auth-enabled backend.
+- **2026-05-10** — SSE handler dedupes by `event_id` across replay/queue boundary. Early events (e.g. `PIPELINE_STARTED`) were yielded twice; frontend was masking it via its own dedupe.
