@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     primary_model: str = "claude-sonnet-4-6"
     secondary_model: str = "claude-haiku-4-5-20251001"
     max_tokens: int = 8192
-    api_timeout: int = 120  # seconds
+    api_timeout: int = 600  # seconds — generous headroom over Developer's ~110s typical call
     max_llm_retries: int = 3
     llm_retry_base_delay_seconds: float = 2.0
 
