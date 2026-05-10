@@ -85,23 +85,31 @@ async def stream_events(run_id: str):
 
         return EventSourceResponse(_replay_from_db())
 
-    # Live run — replay existing events then stream from queue
+    # Live run — replay existing events then stream from queue.
+    # Events are pushed to BOTH runner.current_run.events and the queue,
+    # so anything in the queue at subscription time is also in the replay.
+    # Track event_ids to dedupe across the boundary.
     async def _stream() -> AsyncGenerator[str, None]:
         runner = entry.runner
+        seen_ids: set[str] = set()
 
         # Replay events already emitted before this client connected
         if runner.current_run:
             for event in list(runner.current_run.events):
+                seen_ids.add(event.event_id)
                 yield event.to_sse()
 
                 # If we already have a terminal event, no need to wait on queue
                 if event.event_type.value in _TERMINAL_EVENTS:
                     return
 
-        # Stream new events from the queue
+        # Stream new events from the queue, skipping any already replayed
         while True:
             try:
                 event = await asyncio.wait_for(entry.event_queue.get(), timeout=_SSE_KEEPALIVE_TIMEOUT)
+                if event.event_id in seen_ids:
+                    continue
+                seen_ids.add(event.event_id)
                 yield event.to_sse()
 
                 if event.event_type.value in _TERMINAL_EVENTS:
@@ -114,6 +122,9 @@ async def stream_events(run_id: str):
                 while not entry.event_queue.empty():
                     try:
                         event = entry.event_queue.get_nowait()
+                        if event.event_id in seen_ids:
+                            continue
+                        seen_ids.add(event.event_id)
                         yield event.to_sse()
                         if event.event_type.value in _TERMINAL_EVENTS:
                             return

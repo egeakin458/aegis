@@ -309,6 +309,81 @@ class TestStreamEvents:
 
 
 # ============================================================
+# SSE event-id deduplication
+# ============================================================
+
+class TestSseDeduplication:
+    """Events that fire before a client subscribes land in BOTH
+    runner.current_run.events AND entry.event_queue. The SSE handler
+    must yield each event_id at most once across the replay phase
+    and the live-stream phase.
+    """
+
+    def test_event_ids_appear_once_when_queue_repeats_replayed_events(self, client):
+        import asyncio
+
+        e1 = PipelineEvent(
+            run_id="run-sse-1",
+            agent=AgentName.SYSTEM,
+            event_type=EventType.PIPELINE_STARTED,
+            message="Starting...",
+        )
+        e2 = PipelineEvent(
+            run_id="run-sse-1",
+            agent=AgentName.REQUIREMENTS_ANALYST,
+            event_type=EventType.AGENT_START,
+            message="RA starting",
+        )
+        e_terminal = PipelineEvent(
+            run_id="run-sse-1",
+            agent=AgentName.SYSTEM,
+            event_type=EventType.PIPELINE_COMPLETE,
+            message="Done",
+        )
+
+        run = PipelineRun(run_id="run-sse-1")
+        run.events = [e1, e2]
+        run.state = PipelineState.DEVELOPMENT
+
+        runner_mock = MagicMock()
+        runner_mock.current_run = run
+
+        queue: asyncio.Queue = asyncio.Queue()
+        queue.put_nowait(e1)
+        queue.put_nowait(e2)
+        queue.put_nowait(e_terminal)
+
+        entry_mock = MagicMock()
+        entry_mock.runner = runner_mock
+        entry_mock.event_queue = queue
+
+        with patch("app.api.routes.runner_manager") as mock_manager:
+            mock_manager.get_entry.return_value = entry_mock
+
+            response = client.get(
+                "/api/pipeline/run-sse-1/events",
+                headers={"Accept": "text/event-stream"},
+            )
+            assert response.status_code == 200
+
+            event_ids: list[str] = []
+            for line in response.text.split("\n"):
+                line = line.strip()
+                if line.startswith("data:"):
+                    payload = line[5:].strip()
+                    if payload:
+                        try:
+                            event_ids.append(json.loads(payload).get("event_id"))
+                        except json.JSONDecodeError:
+                            pass
+
+            assert len(event_ids) == len(set(event_ids)), (
+                f"SSE stream emitted duplicate event_ids: {event_ids}"
+            )
+            assert set(event_ids) == {e1.event_id, e2.event_id, e_terminal.event_id}
+
+
+# ============================================================
 # Health check (existing endpoint sanity)
 # ============================================================
 
