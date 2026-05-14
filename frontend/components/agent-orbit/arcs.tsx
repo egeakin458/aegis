@@ -34,8 +34,8 @@ export function OrbitArcs({ cx, cy, r, activeSegment }: Props) {
   return (
     <motion.g
       style={{ transformOrigin: `${cx}px ${cy}px` }}
-      animate={{ rotate: activeSegment === null ? 360 : 0 }}
-      transition={{ duration: 60, repeat: activeSegment === null ? Infinity : 0, ease: 'linear' }}
+      animate={{ rotate: 0 }}
+      transition={{ duration: 0 }}
     >
       {ARCS.map((arc, i) => {
         const d = arcPath(cx, cy, r, arc.start, arc.end)
