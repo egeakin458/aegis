@@ -4,7 +4,7 @@ import type { FileGeneratedEntry } from '@/lib/types/ui'
 const ACTION_COLORS = {
   created: 'text-emerald-400',
   updated: 'text-amber-400',
-  removed: 'text-red-400',
+  removed: 'text-amber-400',
 }
 
 export function FileGeneratedCard({ entry }: { entry: FileGeneratedEntry }) {

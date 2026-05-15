@@ -1,25 +1,38 @@
+import { AlertTriangle, XCircle } from 'lucide-react'
 import { AgentBadge } from '../agent-badge'
-import { TypeIcon } from '../type-icon'
 import type { ErrorEntry } from '@/lib/types/ui'
 
-export function ErrorCard({ entry }: { entry: ErrorEntry }) {
+interface Props {
+  entry: ErrorEntry
+  onStartOver?: () => void
+}
+
+export function ErrorCard({ entry, onStartOver }: Props) {
+  const isTerminal = entry.terminal
+
+  const palette = isTerminal
+    ? { border: 'border-red-800/50', bg: 'bg-red-950/20', text: 'text-red-200', icon: 'text-red-400' }
+    : { border: 'border-amber-800/50', bg: 'bg-amber-950/20', text: 'text-amber-200', icon: 'text-amber-400' }
+
+  const Icon = isTerminal ? XCircle : AlertTriangle
+
   return (
-    <div className="border border-red-800/50 rounded-lg p-4 my-2 bg-red-950/20">
+    <div className={`border ${palette.border} rounded-lg p-4 my-2 ${palette.bg}`}>
       <div className="flex items-center gap-2 mb-2">
         <AgentBadge agent={entry.agent} />
-        <TypeIcon type="error-entry" />
-        <span className="text-sm font-medium text-red-200">{entry.message}</span>
+        <Icon size={16} className={palette.icon} />
+        <span className={`text-sm font-medium ${palette.text}`}>{entry.message}</span>
       </div>
-      {entry.detail && (
+      {entry.detail && isTerminal && (
         <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap">{entry.detail}</pre>
       )}
-      {entry.terminal && (
+      {isTerminal && onStartOver && (
         <div className="mt-3 flex gap-2">
-          <button className="px-3 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
+          <button
+            onClick={onStartOver}
+            className="px-3 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+          >
             Start Over
-          </button>
-          <button className="px-3 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
-            View Logs
           </button>
         </div>
       )}

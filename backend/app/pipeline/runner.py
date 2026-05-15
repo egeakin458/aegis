@@ -350,6 +350,40 @@ class PipelineRunner:
         if verdict == "approve":
             return PipelineState.COMPLETE
 
+        # Emit a single REVISION_REQUESTED event carrying the full QA review payload
+        # so the console can render an "integrate the user" card (severity-grouped
+        # issues, affected files, suggestions, quality score, round X of Y). Fires
+        # only when the agents will actually iterate — cap-reached paths below fall
+        # through to a 'partial' COMPLETE outcome and skip this beat.
+        def _emit_revision_requested(target_role: str, current_count: int, max_count: int) -> None:
+            self.emit_event(PipelineEvent(
+                run_id=self.current_run.run_id,
+                agent=AgentName.QA_REVIEWER,
+                event_type=EventType.REVISION_REQUESTED,
+                message=(
+                    f"Our reviewer found {len(result.issues)} issue(s) to address. "
+                    f"Sending back to the {target_role}."
+                ),
+                data={
+                    "verdict": verdict,
+                    "summary": result.summary,
+                    "code_quality_score": result.code_quality_score,
+                    "issues": [
+                        {
+                            "id": i.id,
+                            "severity": i.severity.value if hasattr(i.severity, "value") else i.severity,
+                            "category": i.category.value if hasattr(i.category, "value") else i.category,
+                            "affected_file": i.affected_file,
+                            "description": i.description,
+                            "suggestion": i.suggestion,
+                        }
+                        for i in result.issues
+                    ],
+                    "revision_number": current_count + 1,
+                    "revision_max": max_count,
+                },
+            ))
+
         if verdict == "revise_code":
             if self.code_revision_count >= settings.max_code_revision_cycles:
                 logger.info(
@@ -358,6 +392,7 @@ class PipelineRunner:
                 )
                 self.current_run.outcome = "partial"
                 return PipelineState.COMPLETE
+            _emit_revision_requested("developer", self.code_revision_count, settings.max_code_revision_cycles)
             return PipelineState.CODE_REVISION
 
         if verdict == "revise_design":
@@ -367,9 +402,11 @@ class PipelineRunner:
                     settings.max_design_revision_cycles,
                 )
                 if self.code_revision_count < settings.max_code_revision_cycles:
+                    _emit_revision_requested("developer", self.code_revision_count, settings.max_code_revision_cycles)
                     return PipelineState.CODE_REVISION
                 self.current_run.outcome = "partial"
                 return PipelineState.COMPLETE
+            _emit_revision_requested("architect", self.design_revision_count, settings.max_design_revision_cycles)
             return PipelineState.DESIGN_REVISION
 
         # Unknown verdict — treat as approved

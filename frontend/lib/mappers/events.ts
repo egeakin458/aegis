@@ -66,17 +66,42 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         assumptions: [],
       }
 
-    case 'revision_requested':
+    case 'revision_requested': {
+      const rawIssues = (d.issues as Array<{
+        id?: string
+        severity?: string
+        category?: string
+        affected_file?: string | null
+        description?: string
+        suggestion?: string | null
+      }>) ?? []
+      const verdictRaw = (d.verdict as string) ?? 'revise_code'
+      const verdict: 'revise_code' | 'revise_design' =
+        verdictRaw === 'revise_design' ? 'revise_design' : 'revise_code'
       return {
         id, type: 'revision-requested', agent, timestamp,
-        verdict: (d.verdict as string) ?? '',
-        issues: (d.issues as string[]) ?? [],
+        verdict,
+        summary: (d.summary as string) ?? '',
+        issues: rawIssues.map((i, idx) => ({
+          id: i.id ?? `issue_${idx}`,
+          severity: ((['critical', 'major', 'minor', 'suggestion'] as const).includes(i.severity as 'critical' | 'major' | 'minor' | 'suggestion')
+            ? i.severity
+            : 'minor') as 'critical' | 'major' | 'minor' | 'suggestion',
+          category: i.category ?? '',
+          affectedFile: i.affected_file ?? null,
+          description: i.description ?? '',
+          suggestion: i.suggestion ?? null,
+        })),
+        codeQualityScore: (d.code_quality_score as number) ?? 3,
         revisionNumber: (d.revision_number as number) ?? 1,
+        revisionMax: (d.revision_max as number) ?? 2,
         expanded: false,
       }
+    }
 
     case 'revision_started':
-      return { id, type: 'message', agent, timestamp, text: event.message }
+      // Suppressed — REVISION_REQUESTED now carries the user-visible message.
+      return null
 
     case 'file_generated':
       return {
@@ -120,6 +145,7 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         totalTokens: stateTotalTokens,
         durationMs: 0,
         fileCount: 0,
+        featureStatus: (d.feature_status as { name: string; implemented: boolean; evidence?: string | null }[]) ?? undefined,
       }
 
     case 'pipeline_partial':
@@ -130,6 +156,7 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
         durationMs: 0,
         fileCount: 0,
         partial: true,
+        featureStatus: (d.feature_status as { name: string; implemented: boolean; evidence?: string | null }[]) ?? undefined,
       }
 
     case 'build_check_start':

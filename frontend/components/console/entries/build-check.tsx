@@ -8,11 +8,11 @@ export function BuildCheckCard({ entry }: { entry: BuildCheckEntry }) {
     <div className={`border rounded-lg p-4 my-2 ${
       entry.passed
         ? 'border-emerald-800/50 bg-emerald-950/20'
-        : 'border-red-800/50 bg-red-950/20'
+        : 'border-amber-800/50 bg-amber-950/20'
     }`}>
       <div className="flex items-center gap-2 mb-1">
         <span className={`text-xs font-semibold uppercase tracking-wide ${
-          entry.passed ? 'text-emerald-400' : 'text-red-400'
+          entry.passed ? 'text-emerald-400' : 'text-amber-400'
         }`}>
           {entry.passed ? '✓ Build Check Passed' : '✗ Build Check Failed'}
         </span>
@@ -45,6 +45,12 @@ export function BuildCheckCard({ entry }: { entry: BuildCheckEntry }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {!entry.passed && (
+        <p className="text-xs text-slate-400 mt-3 italic">
+          The agents will review these and try again — no action needed on your side.
+        </p>
       )}
     </div>
   )

@@ -24,6 +24,8 @@ export type ConsoleEntryType =
   | 'file-generated'
   | 'clarification'
   | 'config-finalized'
+  | 'config-submitted'
+  | 'flow-primer'
   | 'revision-requested'
   | 'build-check'
   | 'error-entry'
@@ -44,9 +46,30 @@ export interface FileGeneratedEntry extends BaseEntry { type: 'file-generated'; 
 export interface ClarificationQuestion { id: string; question: string; answer?: string }
 export interface ClarificationEntry extends BaseEntry { type: 'clarification'; questions: ClarificationQuestion[]; submitted: boolean }
 export interface ConfigFinalizedEntry extends BaseEntry { type: 'config-finalized'; projectSummary: string; assumptions: string[] }
-export interface RevisionRequestedEntry extends BaseEntry { type: 'revision-requested'; verdict: string; issues: string[]; revisionNumber: number; expanded: boolean }
+export interface ConfigSubmittedEntry extends BaseEntry { type: 'config-submitted'; projectName: string; description: string }
+export interface FlowPrimerEntry extends BaseEntry { type: 'flow-primer' }
+export type IssueSeverity = 'critical' | 'major' | 'minor' | 'suggestion'
+export interface ReviewIssue {
+  id: string
+  severity: IssueSeverity
+  category: string
+  affectedFile: string | null
+  description: string
+  suggestion: string | null
+}
+export interface RevisionRequestedEntry extends BaseEntry {
+  type: 'revision-requested'
+  verdict: 'revise_code' | 'revise_design'
+  summary: string
+  issues: ReviewIssue[]
+  codeQualityScore: number
+  revisionNumber: number
+  revisionMax: number
+  expanded: boolean
+}
 export interface ErrorEntry extends BaseEntry { type: 'error-entry'; message: string; detail?: string; terminal: boolean }
-export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number; partial?: boolean }
+export interface FeatureStatus { name: string; implemented: boolean; evidence?: string | null }
+export interface SummaryEntry extends BaseEntry { type: 'summary'; projectName: string; totalTokens: number; durationMs: number; fileCount: number; partial?: boolean; featureStatus?: FeatureStatus[] }
 
 export interface BuildCheckIssue { file: string; line?: number | null; column?: number | null; severity: 'error' | 'warning'; message: string; check: string }
 export interface BuildCheckEntry extends BaseEntry { type: 'build-check'; passed: boolean; filesChecked: number; durationMs: number; issues: BuildCheckIssue[] }
@@ -54,6 +77,7 @@ export interface BuildCheckEntry extends BaseEntry { type: 'build-check'; passed
 export type ConsoleEntry =
   | AgentStartEntry | AgentCompleteEntry | MessageEntry | ProgressUpdateEntry
   | FileGeneratedEntry | ClarificationEntry | ConfigFinalizedEntry
+  | ConfigSubmittedEntry | FlowPrimerEntry
   | RevisionRequestedEntry | BuildCheckEntry | ErrorEntry | SummaryEntry
 
 export interface PipelineState {

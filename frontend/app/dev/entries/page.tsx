@@ -30,8 +30,41 @@ const ALL_ENTRIES: ConsoleEntry[] = [
   },
   {
     id: 'e9', type: 'revision-requested', agent: 'qa', verdict: 'revise_code',
-    issues: ['Missing error handling in API routes', 'No loading states in UI', 'TypeScript types incomplete'],
-    revisionNumber: 1, expanded: false, timestamp: '10:05:00',
+    summary: 'Endpoints are wired and the schema is sound, but a few production-readiness gaps need a second pass before we ship.',
+    codeQualityScore: 3,
+    revisionNumber: 1, revisionMax: 2,
+    issues: [
+      {
+        id: 'iss_1', severity: 'critical', category: 'security',
+        affectedFile: 'app/api/notes/[id]/route.js',
+        description: 'DELETE handler accepts any id without validating ownership — anonymous visitors can delete each other\'s notes.',
+        suggestion: 'Add an ownership check or scope deletes to a session-bound visitor token before invoking the SQL DELETE.',
+      },
+      {
+        id: 'iss_2', severity: 'major', category: 'reliability',
+        affectedFile: 'app/api/notes/route.js',
+        description: 'POST handler does not enforce the 500-character body limit from rule_body_max.',
+        suggestion: 'Reject with HTTP 422 when body.length > 500 before inserting; mirror the error envelope used by other routes.',
+      },
+      {
+        id: 'iss_3', severity: 'minor', category: 'ui',
+        affectedFile: 'components/NoteCard.js',
+        description: 'No loading state while a delete request is in flight; the row stays clickable and can produce duplicate requests.',
+        suggestion: 'Disable the Delete button and show a spinner between request start and revalidation.',
+      },
+      {
+        id: 'iss_4', severity: 'suggestion', category: 'quality',
+        affectedFile: null,
+        description: 'Consider extracting the shared "fetch + revalidate" pattern into a single hook to reduce duplication across pages.',
+        suggestion: 'Pull the SWR boilerplate into hooks/useNotes.js and import from both list and detail pages.',
+      },
+    ],
+    expanded: false, timestamp: '10:05:00',
+  },
+  {
+    id: 'e9b', type: 'error-entry', agent: 'sa',
+    message: "Our architect's draft didn't validate; retrying.",
+    detail: undefined, terminal: false, timestamp: '10:05:30',
   },
   { id: 'e10', type: 'error-entry', agent: 'sys', message: 'Pipeline failed: LLM timeout', detail: 'Connection timed out after 30s', terminal: true, timestamp: '10:06:00' },
   { id: 'e11', type: 'summary', agent: 'sys', projectName: 'InventoryPro', totalTokens: 42000, durationMs: 380000, fileCount: 18, timestamp: '10:08:00' },
