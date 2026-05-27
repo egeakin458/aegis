@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as pipeline_router
 from app.config import settings
 from app.db.database import close_db, init_db
+from app.launcher import app_launcher
 
 
 @asynccontextmanager
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     settings.validate_required()
     await init_db()
     yield
+    await app_launcher.shutdown()
     await close_db()
 
 
