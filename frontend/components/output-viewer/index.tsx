@@ -4,6 +4,7 @@ import { X, Download, ChevronRight, ChevronDown, FileCode } from 'lucide-react'
 import type { OutputManifest, OutputFile } from '@/lib/types/api'
 import { authHeaders } from '@/lib/api/client'
 import { QuickstartPanel } from './quickstart-panel'
+import { LaunchPanel } from './launch-panel'
 
 interface Props {
   manifest: OutputManifest | null
@@ -148,6 +149,7 @@ export function OutputViewer({ manifest, runId, open, onClose }: Props) {
           </div>
         </div>
 
+        {runId && <LaunchPanel runId={runId} />}
         {runId && <QuickstartPanel runId={runId} />}
 
         <div className="flex flex-1 overflow-hidden">
