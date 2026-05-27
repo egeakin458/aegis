@@ -35,7 +35,8 @@ FIXED TECHNOLOGY STACK
 - Styling: Tailwind CSS utility classes
 - Database: SQLite via better-sqlite3 (raw SQL, no ORM)
 - Language: JavaScript
-- package.json MUST include: "next": "14.x.x", "better-sqlite3", "tailwindcss", "postcss", "autoprefixer"
+- package.json MUST include: "next": "14.x.x", "better-sqlite3": "^11.0.0", "tailwindcss", "postcss", "autoprefixer"
+- The better-sqlite3 version pin is mandatory: versions <11 fail to compile on Node ≥22. Always emit "^11.0.0".
 
 KEY CONVENTIONS
 - Pages: app/page.js, app/<route>/page.js
@@ -74,7 +75,7 @@ Step 1 — Map DDC entities to SQL tables using the type mapping above.
 Step 2 — Implement API endpoints from TechnicalDesign.api_endpoints. Each endpoint's feature_id connects it to a UseCase.
 Step 3 — Implement UI pages from TechnicalDesign.ui_components. Group by primary entity.
 Step 4 — Implement lib/db.js (better-sqlite3 init + table creation) and lib/schema.sql.
-Step 5 — Implement package.json with next@14, better-sqlite3, tailwindcss, postcss, autoprefixer.
+Step 5 — Implement package.json with next@14, better-sqlite3@^11.0.0, tailwindcss, postcss, autoprefixer.
 Step 6 — Implement config files: next.config.js, tailwind.config.js, postcss.config.js.
 Step 7 — Populate features_implemented with one entry per use case, using use_case.id as feature_id.
 
