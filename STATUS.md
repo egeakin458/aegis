@@ -2,7 +2,7 @@
 
 Live state. Post-competition (2026-05-16 has passed). Back in development mode.
 
-288/288 unit tests pass at last verification (2026-05-15). E2E smoke last green on `benchmark_02_todo_ddc` (run `ab4f5a1e`, 2026-05-10) — 19 files generated, 100% feature/test score, 231.8 s wall. **Re-run the smoke before resuming feature work** — 12 days have elapsed since the last verified green run.
+E2E smoke green on `benchmark_02_todo_ddc` 2026-05-27 (run `d40f9c05`) — 19 files generated, 100% feature/test score, 284.8 s wall, 1 code revision (build check caught `eslint` dep drift, Developer fixed in one cycle). 288/288 unit tests passed at last verification (2026-05-15).
 
 ---
 
@@ -43,7 +43,7 @@ Carried from pre-competition. Numbering preserved for traceability.
 
 - **#6** — Top-level pipeline timeout. Bounds worst-case hang at the pipeline level (not just per-agent). Today a stuck agent can pin a run indefinitely.
 - **#7** — Developer prompt PATCH tightening. Phase 5 patch semantics work but the prompt occasionally produces ambiguous diffs.
-- **#8** — QA verdict consistency. Investigate whether QA is rubber-stamping (suspected pattern of always-4-or-5 scores).
+- **#8** — QA verdict consistency. Investigate whether QA is rubber-stamping (suspected pattern of always-4-or-5 scores). **Blocker**: today the QA agent's verdict + `code_quality_score` are not persisted to `pipeline_events.data_json` — only the downstream action (`revision_started` or `pipeline_complete`) is visible. To run the audit, first wire the QA payload into the `agent_complete` event for `qa_reviewer`. Observed 2026-05-27 during smoke re-verification.
 - **#9** — Startup sweep. Clean stale state on backend start (orphaned runs, half-written outputs).
 - **#10** — `_sanitize_path` edge case in `save_output`. Specific edge case noted but not pinned down — needs reproducer.
 - **#11** — better-sqlite3 Node 22+ incompat. Pin to `^11.0.0` in Developer prompt deps allowlist and in `backend/app/pipeline/build_checker.py:_ALLOWED_DEPS`. Also extend `backend/build_sandbox/package.json` and rerun `setup_build_sandbox.sh --force`.
@@ -55,6 +55,7 @@ Carried from pre-competition. Numbering preserved for traceability.
 
 Pre-competition rehearsal-week work consolidated. For per-fix detail see commit `0a522bb` body and `git log --since=2026-05-10 --until=2026-05-16`.
 
+- **2026-05-27** — **E2E smoke re-verified green** on `benchmark_02_todo_ddc` (run `d40f9c05`, 284.8 s wall, 100% feature/test score). Build check correctly caught Developer emitting `eslint` in `package.json` (not in `_ALLOWED_DEPS`); Developer fixed on revision 1; second build_check passed in 15.6 s. Confirms pipeline still works end-to-end post-cleanup. Side finding: QA agent's verdict + score aren't persisted to event payloads today, see Backlog #8.
 - **2026-05-27** — Post-competition cleanup: shipped the 11-day-old uncommitted UX polish as a single `feat(demo)` commit (`0a522bb`); archived competition artifacts (poster, UML, screenshots, walkthrough scripts, root-level puppeteer deps) under `docs/archive/competition_2026-05-16/` (`3e3f30b`).
 - **2026-05-15** — Amber palette for mid-pipeline events + rich revision card; orbit idle rotation removed (`0a522bb`, originally `da34652` / `16625aa`).
 - **2026-05-11** — UX Day-1 → Day-5 fixes: Quick-path auth scope, validation-retry messaging, ErrorCard wiring, idle CTA, echo-description card, file-row grouping, ZIP quickstart panel, build-check softening, flow primer, clarification context, top-bar cleanup, free-text examples, feature_status in summary, manual reconnect, duplicate-phase fix, Quick-mode Back hidden, orbit center wrap, Suspense fallback, default file in OutputViewer, share link, per-phase ETAs (`0a522bb`).
