@@ -55,6 +55,24 @@ The SSE endpoint replays events already in `runner.current_run.events`, then blo
 
 On pipeline completion, `save_output()` writes each `CodeFile` to `outputs/{run_id}/{path}` and creates `manifest.json`. Path traversal is blocked via `_sanitize_path` (rejects `..` and absolute paths). The manifest includes inline file content — the frontend `OutputViewer` reads it directly.
 
+### Running a Generated App
+
+Each `outputs/{run_id}/` is a self-contained Next.js 14 project. To run it:
+
+```bash
+cd backend/outputs/<run_id>
+npm install                  # pulls real better-sqlite3, compiles native (~30–60 s)
+npm run dev -- -p 3100       # use 3100 to avoid colliding with frontend on 3000
+```
+
+Newest run shortcut:
+
+```bash
+cd "backend/outputs/$(ls -t backend/outputs | head -1)" && npm install && npm run dev -- -p 3100
+```
+
+**Do not run from `backend/build_sandbox/`** — `better-sqlite3` is stubbed there for the build check. Generated apps must install fresh from `outputs/{run_id}/` to get the real native binding. `better-sqlite3` requires `build-essential` + `python3` on the host. SQLite DB file is created in the app's cwd on first request — delete to reset state.
+
 ### API Endpoints
 
 All under prefix `/api/pipeline`:
@@ -66,6 +84,7 @@ All under prefix `/api/pipeline`:
 | POST | `/{run_id}/clarification` | Submit answers to resume paused pipeline |
 | GET | `/{run_id}/status` | Current state, tokens, feedback cycles |
 | GET | `/{run_id}/output` | Generated code manifest (only when complete) |
+| GET | `/{run_id}/output/download` | ZIP archive of all generated files |
 
 ### Key Singletons
 

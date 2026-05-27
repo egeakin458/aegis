@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { OrbitPhase } from '@/lib/types/ui'
 
 const MESSAGES: Record<OrbitPhase, { title: string; sub: string }> = {
-  idle: { title: 'Ready', sub: 'Submit the intake form to begin' },
+  idle: { title: 'Ready', sub: 'Start with the intake form' },
   'ra-running': { title: 'Analyzing', sub: 'Requirements Analyst is working' },
   'ra-clarification': { title: 'Waiting', sub: 'Clarification needed' },
   'sa-running': { title: 'Designing', sub: 'Solution Architect is working' },
@@ -22,7 +22,7 @@ export function CenterPanel({ phase, cx, cy }: { phase: OrbitPhase; cx: number; 
   return (
     <g>
       <circle r={65} cx={cx} cy={cy} fill="rgba(15,23,42,0.75)" stroke="#1e3a4a" strokeWidth={1} />
-      <foreignObject x={cx - 75} y={cy - 32} width={150} height={64}>
+      <foreignObject x={cx - 90} y={cy - 36} width={180} height={72}>
         <AnimatePresence mode="wait">
           <motion.div
             key={phase}

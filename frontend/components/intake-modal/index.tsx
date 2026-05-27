@@ -179,14 +179,16 @@ export function IntakeModal({ open, onClose, onSubmit }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 shrink-0">
-          <button
-            type="button"
-            onClick={() => setSection(s => Math.max(0, s - 1))}
-            disabled={section === 0 || mode === 'free-text'}
-            className="px-4 py-2 text-sm rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500 disabled:opacity-40 transition-colors"
-          >
-            Back
-          </button>
+          {mode === 'structured' ? (
+            <button
+              type="button"
+              onClick={() => setSection(s => Math.max(0, s - 1))}
+              disabled={section === 0}
+              className="px-4 py-2 text-sm rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500 disabled:opacity-40 transition-colors"
+            >
+              Back
+            </button>
+          ) : <span />}
           {(mode === 'structured' && section < maxSection) ? (
             <button
               type="button"

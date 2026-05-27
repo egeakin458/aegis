@@ -29,6 +29,9 @@ type Action =
   | { type: 'MARK_CLARIFICATION_SUBMITTED'; entryId: string }
   | { type: 'CONNECTION_CHANGE'; connectionState: ConnectionState }
   | { type: 'OUTPUT_LOADED'; manifest: OutputManifest }
+  | { type: 'SUBMIT_ERROR'; message: string; detail?: string }
+  | { type: 'CONFIG_SUBMITTED'; projectName: string; description: string }
+  | { type: 'FLOW_PRIMER' }
   | { type: 'RESET' }
 
 const INITIAL_STATE: State = {
@@ -69,6 +72,41 @@ function reducer(state: State, action: Action): State {
             : e
         ),
       }
+
+    case 'FLOW_PRIMER': {
+      const primerEntry: ConsoleEntry = {
+        id: `flow-primer-${Date.now()}`,
+        type: 'flow-primer',
+        agent: 'sys',
+        timestamp: new Date().toLocaleTimeString(),
+      }
+      return { ...state, entries: [...state.entries, primerEntry] }
+    }
+
+    case 'CONFIG_SUBMITTED': {
+      const submittedEntry: ConsoleEntry = {
+        id: `config-submitted-${Date.now()}`,
+        type: 'config-submitted',
+        agent: 'sys',
+        timestamp: new Date().toLocaleTimeString(),
+        projectName: action.projectName,
+        description: action.description,
+      }
+      return { ...state, entries: [...state.entries, submittedEntry] }
+    }
+
+    case 'SUBMIT_ERROR': {
+      const errorEntry: ConsoleEntry = {
+        id: `submit-error-${Date.now()}`,
+        type: 'error-entry',
+        agent: 'sys',
+        timestamp: new Date().toLocaleTimeString(),
+        message: action.message,
+        detail: action.detail,
+        terminal: true,
+      }
+      return { ...state, entries: [...state.entries, errorEntry] }
+    }
 
     case 'RESET':
       return { ...INITIAL_STATE, seenEventIds: new Set() }
@@ -160,9 +198,14 @@ export function usePipeline() {
   // On mount: hydrate from ?run= URL param (replay case)
   useEffect(() => {
     const runId = searchParams.get('run')
-    if (runId && runId !== runIdRef.current) {
+    if (runId) {
+      const isFirstAttach = runId !== runIdRef.current
       runIdRef.current = runId
-      dispatch({ type: 'SET_RUN', runId, isReplay: true })
+      if (isFirstAttach) {
+        dispatch({ type: 'SET_RUN', runId, isReplay: true })
+      }
+      // Always (re)open SSE — handles React 18 dev StrictMode double-mount,
+      // where cleanup closes the stream and the second mount must reopen it.
       connectSSE(runId)
     }
     return () => { sseRef.current?.close() }
@@ -175,10 +218,25 @@ export function usePipeline() {
       const { run_id } = await startPipeline(config)
       runIdRef.current = run_id
       dispatch({ type: 'SET_RUN', runId: run_id, isReplay: false })
+      dispatch({
+        type: 'CONFIG_SUBMITTED',
+        projectName: config.context.name,
+        description: config.context.domain_description,
+      })
+      dispatch({ type: 'FLOW_PRIMER' })
       router.push(`?run=${run_id}`, { scroll: false })
       connectSSE(run_id)
     } catch (err) {
       console.error('[usePipeline] startRun failed:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      const is401 = msg.startsWith('401')
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: is401
+          ? 'Backend rejected the request — check `NEXT_PUBLIC_API_KEY` in `frontend/.env.local`.'
+          : 'Could not start the pipeline. The backend did not accept the request.',
+        detail: msg,
+      })
     }
   }, [router, connectSSE])
 
@@ -192,8 +250,21 @@ export function usePipeline() {
       await apiSubmitClarification(runIdRef.current, answers)
     } catch (err) {
       console.error('[usePipeline] submitClarification failed:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      const is401 = msg.startsWith('401')
+      dispatch({
+        type: 'SUBMIT_ERROR',
+        message: is401
+          ? 'Backend rejected the request — check `NEXT_PUBLIC_API_KEY` in `frontend/.env.local`.'
+          : 'Could not submit your answers. The backend did not accept the request.',
+        detail: msg,
+      })
     }
   }, [])
+
+  const reconnect = useCallback(() => {
+    if (runIdRef.current) connectSSE(runIdRef.current)
+  }, [connectSSE])
 
   const resetRun = useCallback(() => {
     sseRef.current?.close()
@@ -203,5 +274,5 @@ export function usePipeline() {
     router.push('/', { scroll: false })
   }, [router])
 
-  return { state, startRun, submitClarification: handleClarification, resetRun }
+  return { state, startRun, submitClarification: handleClarification, resetRun, reconnect }
 }

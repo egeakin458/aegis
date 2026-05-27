@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Download, ChevronRight, ChevronDown, FileCode } from 'lucide-react'
 import type { OutputManifest, OutputFile } from '@/lib/types/api'
 import { authHeaders } from '@/lib/api/client'
+import { QuickstartPanel } from './quickstart-panel'
 
 interface Props {
   manifest: OutputManifest | null
@@ -74,9 +75,21 @@ function TreeNodeRow({
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
+const DEFAULT_FILE_PRIORITY = ['README.md', 'app/page.js', 'app/page.jsx', 'app/page.tsx', 'package.json']
+
 export function OutputViewer({ manifest, runId, open, onClose }: Props) {
   const [selectedFile, setSelectedFile] = useState<OutputFile | null>(null)
   const [downloading, setDownloading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !manifest || selectedFile) return
+    const byPath = new Map(manifest.files.map(f => [f.path, f]))
+    for (const candidate of DEFAULT_FILE_PRIORITY) {
+      const f = byPath.get(candidate)
+      if (f) { setSelectedFile(f); return }
+    }
+    if (manifest.files[0]) setSelectedFile(manifest.files[0])
+  }, [open, manifest, selectedFile])
 
   if (!open) return null
 
@@ -134,6 +147,8 @@ export function OutputViewer({ manifest, runId, open, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        {runId && <QuickstartPanel runId={runId} />}
 
         <div className="flex flex-1 overflow-hidden">
           {/* File tree */}

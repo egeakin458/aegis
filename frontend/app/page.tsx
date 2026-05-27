@@ -1,5 +1,6 @@
 'use client'
 import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { TopBar } from '@/components/top-bar'
 import { AgentOrbit } from '@/components/agent-orbit'
 import { ConsolePane } from '@/components/console'
@@ -11,9 +12,10 @@ import { useElapsed } from '@/lib/hooks/use-elapsed'
 import { useTokenCounter } from '@/lib/hooks/use-token-counter'
 
 function PipelineApp() {
-  const [modalOpen, setModalOpen] = useState(false)
+  const searchParams = useSearchParams()
+  const [modalOpen, setModalOpen] = useState(() => !searchParams.get('run'))
   const [viewerOpen, setViewerOpen] = useState(false)
-  const { state, startRun, submitClarification, resetRun } = usePipeline()
+  const { state, startRun, submitClarification, resetRun, reconnect } = usePipeline()
   const frozen = state.phase === 'complete' || state.phase === 'error'
   const elapsedMs = useElapsed(state.startTime, frozen)
   const displayTokens = useTokenCounter(state.totalTokens)
@@ -41,8 +43,11 @@ function PipelineApp() {
         totalTokens={displayTokens}
         elapsedMs={elapsedMs}
         isReplay={state.isReplay}
-        onNewProject={() => setModalOpen(true)}
-        onStartOver={resetRun}
+        runId={state.runId}
+        onNewProject={() => {
+          resetRun()
+          setModalOpen(true)
+        }}
       />
       {/* Responsive: stacks vertically below lg (1024px), side-by-side above */}
       <main className="flex flex-1 overflow-hidden flex-col lg:flex-row">
@@ -57,6 +62,7 @@ function PipelineApp() {
             entries={state.entries}
             onClarificationSubmit={submitClarification}
             onViewFiles={() => setViewerOpen(true)}
+            onStartOver={resetRun}
           />
         </div>
       </main>
@@ -71,14 +77,25 @@ function PipelineApp() {
         open={viewerOpen}
         onClose={() => setViewerOpen(false)}
       />
-      <ConnectionLostPill state={state.connectionState} hasRun={state.runId !== null} />
+      <ConnectionLostPill state={state.connectionState} hasRun={state.runId !== null} onReconnect={reconnect} />
+    </div>
+  )
+}
+
+function PipelineFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+        Loading Aegis…
+      </div>
     </div>
   )
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0f172a]" />}>
+    <Suspense fallback={<PipelineFallback />}>
       <PipelineApp />
     </Suspense>
   )

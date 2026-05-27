@@ -29,6 +29,32 @@ from app.schemas.pipeline_events import (
 
 logger = logging.getLogger(__name__)
 
+
+def _feature_status(context: dict) -> list[dict]:
+    """Join QA per-feature coverage with DDC use-case names for UI display.
+
+    Returns a list of {name, implemented, evidence} dicts, or [] when either
+    the QA review or the DDC isn't available (e.g. early failure).
+    """
+    qa = context.get("qa_review")
+    ddc = context.get("customer_config_v2")
+    if qa is None or ddc is None:
+        return []
+    try:
+        coverage = getattr(qa, "requirements_coverage", []) or []
+        use_cases = getattr(ddc, "use_cases", []) or []
+    except AttributeError:
+        return []
+    name_by_id = {uc.id: uc.name for uc in use_cases if getattr(uc, "id", None)}
+    out: list[dict] = []
+    for c in coverage:
+        out.append({
+            "name": name_by_id.get(c.feature_id, c.feature_id),
+            "implemented": bool(c.implemented),
+            "evidence": c.evidence,
+        })
+    return out
+
 _EVENT_QUEUE_SIZE = 1000
 
 
@@ -115,11 +141,16 @@ class RunnerManager:
             else:
                 msg = "Your application is ready! Here's what we built."
                 event_type = EventType.PIPELINE_COMPLETE
+
+            feature_status = _feature_status(runner.context)
+            data = {"feature_status": feature_status} if feature_status else {}
+
             runner.emit_event(PipelineEvent(
                 run_id=runner.current_run.run_id,
                 agent=AgentName.SYSTEM,
                 event_type=event_type,
                 message=msg,
+                data=data,
             ))
 
     async def start_run(self, config: CustomerConfigV2) -> str:

@@ -1,0 +1,71 @@
+{
+  "task_id": "benchmark_03_guestbook_ddc",
+  "name": "Public Guestbook (DDC v1)",
+  "description": "A minimal public guestbook where any visitor can leave a signed message and read all previous messages. Single entity, no relationships, no auth.",
+  "complexity": "simple",
+  "customer_config_v2": {
+    "schema_version": "ddc-v1",
+    "context": {
+      "name": "guestbook",
+      "domain_description": "A public guestbook where any visitor can leave a short message with their name and read messages left by others. No accounts, no editing, no deletion.",
+      "industry": "other",
+      "visual_style": "clean_minimal",
+      "mobile_first": false
+    },
+    "actors": [
+      {
+        "id": "act_visit001",
+        "role_name": "Visitor",
+        "auth_method": "anonymous",
+        "permissions_description": "Anyone can post a message and view all messages. No editing or deletion."
+      }
+    ],
+    "entities": [
+      {
+        "id": "ent_msg00001",
+        "name": "Message",
+        "attributes": [
+          { "name": "author_name", "type": "string",   "required": true, "unique": false },
+          { "name": "content",     "type": "text",     "required": true, "unique": false },
+          { "name": "created_at",  "type": "datetime", "required": true, "unique": false }
+        ],
+        "states": ["Posted"],
+        "owned_by_actor_id": "act_visit001"
+      }
+    ],
+    "relationships": [],
+    "business_rules": [],
+    "use_cases": [
+      {
+        "id": "uc_signbk001",
+        "name": "Sign Guestbook",
+        "type": "command",
+        "actor_id": "act_visit001",
+        "primary_entity_id": "ent_msg00001",
+        "business_rule_ids": [],
+        "description": "Visitor submits a new message with their name and content."
+      },
+      {
+        "id": "uc_listmsg1",
+        "name": "View Messages",
+        "type": "query",
+        "actor_id": "act_visit001",
+        "primary_entity_id": "ent_msg00001",
+        "business_rule_ids": [],
+        "description": "Visitor views all messages, newest first."
+      }
+    ]
+  },
+  "expected_features": [
+    "Submit a new guestbook message with author name and content",
+    "View all messages on the page",
+    "Messages display author name, content, and timestamp",
+    "Messages are ordered newest first"
+  ],
+  "unit_tests": [
+    "POST /api/messages creates a message and returns 201",
+    "POST /api/messages rejects empty author_name or content with 400",
+    "GET /api/messages returns an array of messages",
+    "GET /api/messages returns messages sorted by created_at descending"
+  ]
+}

@@ -16,11 +16,23 @@ export function ClarificationCard({ entry, onSubmit }: Props) {
 
   return (
     <div className="border border-amber-800/50 rounded-lg p-4 my-2 bg-amber-950/20">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1">
         <AgentBadge agent="ra" />
         <TypeIcon type="clarification" />
-        <span className="text-sm font-medium text-amber-200">Clarification needed</span>
+        <span className="text-sm font-medium text-amber-200">
+          {entry.submitted ? 'Your answers were sent' : 'Your project analyst needs your input'}
+        </span>
+        {!entry.submitted && (
+          <span className="text-[10px] uppercase tracking-wide text-amber-400/80 ml-auto">
+            Paused
+          </span>
+        )}
       </div>
+      {!entry.submitted && (
+        <p className="text-xs text-slate-400 mb-3">
+          The pipeline is paused until you answer. Your responses shape what gets built.
+        </p>
+      )}
       <div className="space-y-3">
         {entry.questions.map((q, i) => (
           <div key={q.id}>

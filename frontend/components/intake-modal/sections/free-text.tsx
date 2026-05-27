@@ -21,15 +21,73 @@ const STYLE_OPTIONS: { label: string; value: FreeTextFormValues['visualStyle'] }
   { label: 'Playful', value: 'playful' },
 ]
 
+const EXAMPLES: { label: string; values: Partial<FreeTextFormValues> }[] = [
+  {
+    label: 'Todo list',
+    values: {
+      projectName: 'taskmaster',
+      domainDescription:
+        'A personal task manager where a single user can create tasks with a title and optional description, organize them into categories, mark tasks complete, and delete tasks they have finished. Tasks can be filtered by category.',
+      industry: 'other',
+      visualStyle: 'clean_minimal',
+      mobileFirst: true,
+    },
+  },
+  {
+    label: 'Inventory tracker',
+    values: {
+      projectName: 'stockwatch',
+      domainDescription:
+        'A small-business inventory tracker. A staff member can add products with name, SKU, price, and current stock; record stock-in and stock-out events; and see a low-stock alert list. Products can be grouped by category and searched by name.',
+      industry: 'retail',
+      visualStyle: 'professional_corporate',
+      mobileFirst: false,
+    },
+  },
+  {
+    label: 'Event RSVP',
+    values: {
+      projectName: 'rsvp-board',
+      domainDescription:
+        'An event RSVP board. An organizer creates events with a title, date, and location. Guests can browse upcoming events, RSVP yes/no/maybe, and leave a short note. The organizer sees a per-event guest list and counts of each RSVP status.',
+      industry: 'services',
+      visualStyle: 'warm_friendly',
+      mobileFirst: true,
+    },
+  },
+]
+
 interface Props {
   form: UseFormReturn<FreeTextFormValues>
 }
 
 export function FreeTextSection({ form }: Props) {
-  const { register, control, formState: { errors } } = form
+  const { register, control, setValue, formState: { errors } } = form
+
+  function applyExample(values: Partial<FreeTextFormValues>) {
+    for (const [k, v] of Object.entries(values)) {
+      setValue(k as keyof FreeTextFormValues, v as never, { shouldValidate: true, shouldDirty: true })
+    }
+  }
 
   return (
     <div className="space-y-5">
+      <div>
+        <label className="block text-xs font-medium text-slate-300 mb-1.5">Start from an example</label>
+        <div className="flex flex-wrap gap-2">
+          {EXAMPLES.map(ex => (
+            <button
+              key={ex.label}
+              type="button"
+              onClick={() => applyExample(ex.values)}
+              className="px-3 py-1.5 text-xs rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:border-cyan-700 hover:text-cyan-200 transition-colors"
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <label className="block text-xs font-medium text-slate-300 mb-1.5">
           Project Name

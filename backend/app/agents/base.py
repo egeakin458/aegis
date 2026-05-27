@@ -149,12 +149,15 @@ class BaseAgent:
                         f"Agent {self.name.value} failed output validation after retry: {e}"
                     ) from e
 
+                logger.warning(
+                    "Agent %s output validation failed (attempt %d/%d): %s",
+                    self.name.value, attempt + 1, max_attempts, e,
+                )
                 emit_event(PipelineEvent(
                     run_id=run_id,
                     agent=self.name,
                     event_type=EventType.VALIDATION_FAILED,
-                    message=f"{self._display_name()} is revising their output format...",
-                    data={"error": str(e)},
+                    message=f"{self._display_name()}'s draft didn't validate; retrying.",
                 ))
 
     async def _call_llm(
