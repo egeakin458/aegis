@@ -276,14 +276,18 @@ async def launch_app(run_id: str):
     return status.model_dump()
 
 
-@router.post("/launch/stop")
+@router.post("/launcher/stop")
 async def stop_app():
     """Stop the currently-running generated app, if any."""
     status = await app_launcher.stop()
     return status.model_dump()
 
 
-@router.get("/launch/status")
-async def launch_status():
-    """Current state of the generated-app launcher."""
+@router.get("/launcher/state")
+async def launcher_state():
+    """Current state of the generated-app launcher.
+
+    NOTE: deliberately under /launcher/ (not /launch/) so this literal
+    path is not shadowed by the parametric /{run_id}/status route.
+    """
     return app_launcher.status().model_dump()

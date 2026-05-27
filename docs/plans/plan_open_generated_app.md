@@ -77,8 +77,10 @@ Add to `backend/app/api/routes.py`:
 | Method | Path | Returns |
 |---|---|---|
 | `POST` | `/api/pipeline/{run_id}/launch` | `LaunchStatus` (state IMMEDIATELY after request — usually `installing` or `starting`) |
-| `POST` | `/api/pipeline/launch/stop` | `LaunchStatus` |
-| `GET` | `/api/pipeline/launch/status` | `LaunchStatus` |
+| `POST` | `/api/pipeline/launcher/stop` | `LaunchStatus` |
+| `GET` | `/api/pipeline/launcher/state` | `LaunchStatus` |
+
+**Path-collision note:** original draft had `/launch/stop` and `/launch/status`. The parametric `/{run_id}/status` route was registered earlier and would shadow `/launch/status` (run_id="launch"). Using `/launcher/...` for the literal endpoints removes the collision without needing to reorder existing routes.
 
 **Fire-and-poll model:** `/launch` returns immediately after kicking off the work as a background task (`asyncio.create_task`); the response carries `state="installing"` (or `"starting"` if node_modules is ready). Frontend polls `/launch/status` until terminal (`running` or `error`). This matches B2's polling pattern for transitional states and avoids a 60–90 s held HTTP connection.
 
