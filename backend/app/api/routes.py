@@ -23,6 +23,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.api.auth import require_api_key
 from app.config import settings
 from app.db import repositories as repo
+from app.launcher import app_launcher
 from app.pipeline.manager import runner_manager
 from app.schemas.customer_config import CustomerConfigV2, SCHEMA_VERSION as DDC_SCHEMA_VERSION
 from app.schemas.pipeline_events import EventType, PipelineState
@@ -251,3 +252,38 @@ async def download_output(run_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=\"{run_id}.zip\""},
     )
+
+
+# ---------------------------------------------------------------------------
+# Generated-app launcher endpoints (Phase A2 of plan_open_generated_app.md).
+# Single-machine demo only — fires up a Next.js subprocess locally; not safe
+# for the Railway / multi-tenant deployment path.
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{run_id}/launch")
+async def launch_app(run_id: str):
+    """Stop any prior generated app and launch outputs/{run_id}/.
+
+    Fire-and-poll: returns immediately with state='installing' or
+    'starting'; the actual install + start runs as a background task.
+    Frontend should poll GET /launch/status until terminal.
+    """
+    output_dir = Path(settings.output_dir) / run_id
+    if not output_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Output directory not found for run {run_id}")
+    status = await app_launcher.launch(run_id)
+    return status.model_dump()
+
+
+@router.post("/launch/stop")
+async def stop_app():
+    """Stop the currently-running generated app, if any."""
+    status = await app_launcher.stop()
+    return status.model_dump()
+
+
+@router.get("/launch/status")
+async def launch_status():
+    """Current state of the generated-app launcher."""
+    return app_launcher.status().model_dump()
