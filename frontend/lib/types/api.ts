@@ -46,6 +46,7 @@ export type EventType =
   | 'agent_start' | 'agent_complete'
   | 'llm_call_start' | 'llm_call_complete'
   | 'clarification_needed' | 'clarification_received' | 'config_finalized'
+  | 'qa_review_complete'
   | 'revision_requested' | 'revision_started'
   | 'validation_passed' | 'validation_failed'
   | 'file_generated' | 'progress_update'

@@ -103,6 +103,12 @@ export function mapEventToEntry(event: PipelineEvent, stateTotalTokens = 0): Con
       // Suppressed — REVISION_REQUESTED now carries the user-visible message.
       return null
 
+    case 'qa_review_complete':
+      // Suppressed — QA payload is for backend auditing (Backlog #8).
+      // User-visible QA outcome surfaces via revision_requested (revise paths)
+      // or pipeline_complete summary (approve path).
+      return null
+
     case 'file_generated':
       return {
         id, type: 'file-generated', agent, timestamp,

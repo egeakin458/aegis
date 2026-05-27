@@ -417,6 +417,42 @@ class TestDDCPipeline:
         assert qa_context["build_check_result"] is not None
         assert qa_context["build_check_result"].passed is True
 
+    async def test_qa_review_complete_fires_on_approve(self, ddc_ecommerce):
+        """Approve path must emit a QA_REVIEW_COMPLETE event with verdict + score (Backlog #8)."""
+        events: list[PipelineEvent] = []
+        agents = _agents_for_ddc_happy_path(ddc_ecommerce)
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        qa_events = [e for e in events if e.event_type == EventType.QA_REVIEW_COMPLETE]
+        assert len(qa_events) == 1, f"expected exactly one QA_REVIEW_COMPLETE, got {len(qa_events)}"
+        d = qa_events[0].data
+        assert d["verdict"] == "approve"
+        assert d["code_quality_score"] == 4
+        assert "summary" in d
+        assert isinstance(d["issues"], list)
+        assert isinstance(d["requirements_coverage"], list)
+
+    async def test_qa_review_complete_fires_on_revise_code(self, ddc_ecommerce):
+        """Revise paths must also emit QA_REVIEW_COMPLETE, alongside REVISION_REQUESTED."""
+        events: list[PipelineEvent] = []
+        agents = _agents_for_ddc_happy_path(ddc_ecommerce)
+        # QA: first verdict revise_code, then approve after Developer revises.
+        agents["qa_reviewer"].execute = AsyncMock(
+            side_effect=[
+                _make_qa_review(ReviewVerdict.REVISE_CODE),
+                _make_qa_review(ReviewVerdict.APPROVE),
+            ]
+        )
+        runner = self._make_runner(agents, events)
+        await runner.run(ddc_ecommerce)
+        qa_events = [e for e in events if e.event_type == EventType.QA_REVIEW_COMPLETE]
+        rev_events = [e for e in events if e.event_type == EventType.REVISION_REQUESTED]
+        assert len(qa_events) == 2, f"expected 2 QA_REVIEW_COMPLETE, got {len(qa_events)}"
+        assert qa_events[0].data["verdict"] == "revise_code"
+        assert qa_events[1].data["verdict"] == "approve"
+        assert len(rev_events) == 1
+        assert rev_events[0].data["verdict"] == "revise_code"
+
     async def test_ddc_code_revision_context_includes_customer_config_v2(self, ddc_ecommerce):
         """On code revision, Developer must still receive customer_config_v2."""
         events: list[PipelineEvent] = []

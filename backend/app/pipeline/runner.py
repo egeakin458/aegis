@@ -347,6 +347,42 @@ class PipelineRunner:
 
         verdict = result.verdict.value
 
+        # Persist the full QA verdict + score + issues on every review, regardless of
+        # outcome. Without this the approve path only logs a generic agent_complete
+        # event with no QA payload — impossible to audit calibration (Backlog #8).
+        # REVISION_REQUESTED below additionally fires on revise paths with the same
+        # payload + revision_number/max for UI; this event is the canonical record.
+        self.emit_event(PipelineEvent(
+            run_id=self.current_run.run_id,
+            agent=AgentName.QA_REVIEWER,
+            event_type=EventType.QA_REVIEW_COMPLETE,
+            message=f"Quality review complete. Verdict: {verdict}.",
+            data={
+                "verdict": verdict,
+                "code_quality_score": result.code_quality_score,
+                "summary": result.summary,
+                "issues": [
+                    {
+                        "id": i.id,
+                        "severity": i.severity.value if hasattr(i.severity, "value") else i.severity,
+                        "category": i.category.value if hasattr(i.category, "value") else i.category,
+                        "affected_file": i.affected_file,
+                        "description": i.description,
+                        "suggestion": i.suggestion,
+                    }
+                    for i in result.issues
+                ],
+                "requirements_coverage": [
+                    {
+                        "feature_id": c.feature_id,
+                        "implemented": c.implemented,
+                        "evidence": c.evidence,
+                    }
+                    for c in result.requirements_coverage
+                ],
+            },
+        ))
+
         if verdict == "approve":
             return PipelineState.COMPLETE
 

@@ -43,6 +43,9 @@ class EventType(str, Enum):
     CLARIFICATION_RECEIVED = "clarification_received"
     CONFIG_FINALIZED = "config_finalized"
 
+    # QA review outcome (fires on every QA run, regardless of verdict)
+    QA_REVIEW_COMPLETE = "qa_review_complete"
+
     # Feedback loops
     REVISION_REQUESTED = "revision_requested"
     REVISION_STARTED = "revision_started"
