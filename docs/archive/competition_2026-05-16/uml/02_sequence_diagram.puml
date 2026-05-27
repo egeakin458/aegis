@@ -1,0 +1,54 @@
+@startuml AegisSequenceDiagram
+' Aegis — High-Level Sequence Diagram (UML 2.5)
+' Goal: yalnızca ana akış. Clarification/revizyon tek nota.
+
+skinparam backgroundColor #1A1B26
+skinparam defaultFontName "Inter, Helvetica, Arial"
+skinparam defaultFontColor #E6E9EF
+skinparam defaultFontSize 16
+skinparam shadowing false
+skinparam roundCorner 8
+
+skinparam sequence {
+  ArrowColor #9ECE6A
+  ArrowFontColor #C0CAF5
+  ArrowFontSize 15
+  ArrowThickness 2
+  LifeLineBorderColor #7AA2F7
+  LifeLineBackgroundColor #2B2F40
+  ParticipantBackgroundColor #2B2F40
+  ParticipantBorderColor #7AA2F7
+  ParticipantBorderThickness 2
+  ParticipantFontColor #E6E9EF
+  ParticipantFontSize 16
+  ActorBackgroundColor #2B2F40
+  ActorBorderColor #E0AF68
+  ActorFontColor #E6E9EF
+  ActorFontSize 16
+  NoteBackgroundColor #232634
+  NoteBorderColor #73DACA
+  NoteFontColor #E6E9EF
+  NoteFontSize 14
+}
+
+title <b>Aegis — Sequence Diagram</b>
+
+actor "Müşteri" as U #E0AF68
+participant "Gereksinim\nAnalisti" as RA
+participant "Çözüm\nMimarı" as SA
+participant "Geliştirici" as DEV
+participant "Kalite\nGüvence" as QA
+
+U -> RA : Fikir (doğal dil)
+RA -> SA : Gereksinimler
+SA -> DEV : Teknik tasarım
+DEV -> QA : Kod
+QA -> U : Çalışan uygulama
+
+note over RA, QA #232634
+  <b>Geri besleme:</b> QA "düzelt" derse,
+  pipeline ilgili ajana geri döner
+  (kod ≤2 tur, tasarım ≤1 tur).
+end note
+
+@enduml

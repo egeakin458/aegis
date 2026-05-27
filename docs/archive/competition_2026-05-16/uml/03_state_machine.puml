@@ -1,0 +1,54 @@
+@startuml AegisStateMachine
+' Aegis — High-Level State Machine Diagram (UML 2.5)
+' Goal: 5 ana durum + tek "feedback" döngüsü + tek terminal.
+
+!pragma layout smetana
+skinparam backgroundColor #1A1B26
+skinparam defaultFontName "Inter, Helvetica, Arial"
+skinparam defaultFontColor #E6E9EF
+skinparam defaultFontSize 16
+skinparam shadowing false
+skinparam roundCorner 12
+
+skinparam state {
+  BackgroundColor #2B2F40
+  BorderColor #7AA2F7
+  BorderThickness 2
+  FontColor #E6E9EF
+  FontSize 18
+  AttributeFontSize 14
+  AttributeFontColor #C0CAF5
+  ArrowColor #9ECE6A
+  ArrowFontColor #C0CAF5
+  ArrowFontSize 14
+  ArrowThickness 2
+  StartColor #9ECE6A
+  EndColor #F7768E
+}
+skinparam note {
+  BackgroundColor #232634
+  BorderColor #73DACA
+  FontColor #E6E9EF
+  FontSize 14
+}
+
+title <b>Aegis — State Machine Diagram</b>
+
+[*] --> Gereksinim : Müşteri fikri
+
+Gereksinim : <i>RA</i>
+Tasarım    : <i>SA</i>
+Geliştirme : <i>Dev</i>
+İnceleme   : <i>QA</i>
+
+Gereksinim --> Tasarım    : tamamlandı
+Tasarım    --> Geliştirme : tamamlandı
+Geliştirme --> İnceleme   : tamamlandı
+
+İnceleme --> Geliştirme : <b>düzelt</b>\n(≤2 tur)
+İnceleme --> Tamam      : <b>onayla</b>
+
+Tamam : Çalışan\nuygulama
+Tamam --> [*]
+
+@enduml

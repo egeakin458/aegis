@@ -1,0 +1,22 @@
+Kısa cevap: Başarı, projenin şartnamedeki değerlendirme ölçütlerini ne kadar güçlü karşıladığına bağlı. Elindeki fikir, bu ölçütlerle doğru hizalanırsa güçlü bir aday olabilir.
+
+Jürinin baktığı ana ölçütler (Bitirme Projeleri Sergisi):
+
+Özgün Değer: Mevcut çözümlerden net farkın ne? (Doğal dil + eklenti yapısı + birden çok akıllı ajan iş birliği gibi yönleri somutlaştır)
+Yaygın Etki: Hangi kullanıcılar için hangi somut faydayı sağlıyor? (zaman/maliyet/kalite kazanımları)
+Uygulanabilirlik: Çalışan prototip, mimari bileşenler ve temel akış net mi?
+Gerçekleştirme Başarısı: Hangi modülleri tamamladın, entegrasyon/test durumun nedir?
+Sunum Kalitesi: 5 dakikada sorunu–çözümü–yeniliği–etkiyi–demoyu net anlatabiliyor musun?
+Projen için pratik öneriler (senin açıklamana göre):
+
+Problemi keskinleştir: “Kimin hangi geliştirme darboğazını çözüyorum?” sorusuna 1–2 cümlelik net yanıt.
+Farkını ölç: “Bugün X yaparken Y kadar zaman/maliyet harcanıyor, Aegis ile Z kadar azalıyor” gibi kıyas içeren tek slayt.
+Uygulama kanıtı: Kısa bir demo akışı (girdi → ajanlar arası görev paylaşımı → üretilen modül/kod → çalışır çıktı).
+Kalite göstergeleri: Kod standartları, test kapsamı, hataya dayanıklılık veya eklenti mimarisinin yeniden kullanılabilirliği.
+Kullanım senaryoları: 2–3 gerçekçi senaryo (ör. basit CRUD uygulaması, ödeme entegrasyonlu mağaza, dashboard).
+Sınırlar ve sonraki adımlar: Şu an yapabildikleri ve etkinlik sonrası yol haritası.
+Zorunlu hatırlatmalar:
+
+Standında başvuru sırasında verilen QR görselinin çıktısı/ekranı bulunmalı; hakemler bununla puanlama yapar.
+Değerlendirme 1–10 arası puanlanır ve her kategoride en yüksek ağırlıklı ortalamayı alan projeler üst tura çıkar.
+İstersen, 5 dakikalık sunum iskeletini birlikte netleştirelim: 1) Problem (30 sn) 2) Çözüm ve yenilik (60 sn) 3) Mimari ve demo (120 sn) 4) Etki ve ölçümler (60 sn) 5) Yol haritası ve kapanış (30 sn). Tamamladığın modülleri ve gösterebileceğin kısa demoyu paylaşırsan, bu iskeleti şartnameye tam uyacak şekilde keskinleştirebilirim. Kesin bilgi için gerektiğinde Bölüm Sorumlusu ile iletişime geçebilirsin.
