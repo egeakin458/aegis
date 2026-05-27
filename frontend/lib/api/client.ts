@@ -1,4 +1,4 @@
-import type { StartRunResponse, OutputManifest } from '@/lib/types/api'
+import type { StartRunResponse, OutputManifest, LaunchStatus } from '@/lib/types/api'
 import type { CustomerConfigV2 } from '@/lib/schemas/ddc'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -37,3 +37,14 @@ export const submitClarification = (runId: string, answers: Record<string, strin
 
 export const getOutput = (runId: string): Promise<OutputManifest> =>
   apiFetch(`/${runId}/output`)
+
+// --- Generated-app launcher ---
+
+export const launchApp = (runId: string): Promise<LaunchStatus> =>
+  apiFetch(`/${runId}/launch`, { method: 'POST' })
+
+export const stopApp = (): Promise<LaunchStatus> =>
+  apiFetch('/launcher/stop', { method: 'POST' })
+
+export const getLauncherState = (): Promise<LaunchStatus> =>
+  apiFetch('/launcher/state')

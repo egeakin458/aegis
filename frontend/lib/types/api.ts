@@ -57,6 +57,23 @@ export type PipelineStateValue =
   | 'intake' | 'requirements' | 'clarification' | 'design' | 'development'
   | 'build_check' | 'review' | 'code_revision' | 'design_revision' | 'complete' | 'failed'
 
+// ---------------------------------------------------------------------------
+// Generated-app launcher (Backend: app/launcher/)
+// ---------------------------------------------------------------------------
+
+export type LaunchState =
+  | 'idle' | 'installing' | 'starting' | 'running' | 'stopping' | 'error'
+
+export interface LaunchStatus {
+  state: LaunchState
+  run_id: string | null
+  port: number | null
+  url: string | null
+  pid: number | null
+  started_at: string | null
+  error: string | null
+}
+
 export interface TokenUsage { input_tokens: number; output_tokens: number }
 
 export interface PipelineEvent {
