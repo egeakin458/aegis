@@ -217,6 +217,10 @@ class AppLauncher:
 
                 ready = await self._wait_for_ready(port)
                 if not ready:
+                    # Tear down the subprocess so it doesn't keep holding the
+                    # port. If we leave it, the next launch will skip to the
+                    # next port AND we leak an orphan next dev.
+                    self._teardown_subprocess()
                     self._set_error(
                         f"Generated app didn't respond on port {port} within "
                         f"{_START_READY_TIMEOUT_S} s. See {log_path}."
@@ -273,6 +277,11 @@ class AppLauncher:
         return True
 
     async def _wait_for_ready(self, port: int) -> bool:
+        """Return True as soon as Next.js answers on the port — any HTTP
+        response counts. A page-level 500 is an app bug, not a 'not started'
+        signal; the port is bound and the runtime is up. Distinguishing
+        further would require running the app's tests, which is out of
+        scope here. The browser tab will surface app errors naturally."""
         url = f"http://localhost:{port}/"
         deadline = time.monotonic() + _START_READY_TIMEOUT_S
         async with httpx.AsyncClient(timeout=2.0) as client:
@@ -280,9 +289,8 @@ class AppLauncher:
                 if self._popen is not None and self._popen.poll() is not None:
                     return False  # child died
                 try:
-                    r = await client.get(url)
-                    if r.status_code < 500:
-                        return True
+                    await client.get(url)
+                    return True  # any HTTP response means it's listening
                 except (httpx.HTTPError, OSError):
                     pass
                 await asyncio.sleep(_READY_POLL_INTERVAL_S)
@@ -292,6 +300,24 @@ class AppLauncher:
         self._status = self._status.model_copy(
             update={"state": "error", "error": msg}
         )
+
+    def _teardown_subprocess(self) -> None:
+        """Synchronously kill the current subprocess and clear it. Used on
+        the error path inside _run_lifecycle where we can't await the full
+        _stop_locked flow (we hold the lock indirectly via this task)."""
+        if self._popen is None:
+            return
+        if self._popen.poll() is None:
+            _kill_process_group(self._popen.pid, signal.SIGTERM)
+            try:
+                self._popen.wait(timeout=_STOP_SIGKILL_GRACE_S)
+            except subprocess.TimeoutExpired:
+                _kill_process_group(self._popen.pid, signal.SIGKILL)
+                try:
+                    self._popen.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    pass
+        self._popen = None
 
 
 app_launcher = AppLauncher()
