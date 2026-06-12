@@ -1,0 +1,56 @@
+' Shared visual theme — keeps every Aegis diagram visually consistent
+' with AegisComponentDiagram.png.
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 13
+skinparam roundCorner 8
+skinparam ArrowColor #1F6FEB
+skinparam ArrowFontColor #333333
+
+skinparam component {
+  BackgroundColor #EAF1FF
+  BorderColor #1F6FEB
+  FontStyle bold
+}
+skinparam rectangle {
+  BackgroundColor #EAF1FF
+  BorderColor #1F6FEB
+}
+skinparam package {
+  BackgroundColor #F4F8FF
+  BorderColor #1F6FEB
+}
+skinparam class {
+  BackgroundColor #EAF1FF
+  BorderColor #1F6FEB
+  ArrowColor #1F6FEB
+}
+skinparam usecase {
+  BackgroundColor #EAF1FF
+  BorderColor #1F6FEB
+}
+skinparam actor {
+  BorderColor #333333
+}
+skinparam activity {
+  BackgroundColor #EAF1FF
+  BorderColor #1F6FEB
+  DiamondBackgroundColor #FFF8E1
+  DiamondBorderColor #C28F00
+  StartColor #1F6FEB
+  EndColor #1F6FEB
+  BarColor #1F6FEB
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C28F00
+}
+skinparam cloud {
+  BackgroundColor #F3E8FF
+  BorderColor #7C3AED
+}
+skinparam folder {
+  BackgroundColor #E6F8EC
+  BorderColor #2E7D32
+}

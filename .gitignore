@@ -36,6 +36,13 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+*Zone.Identifier
+
+# Local-only artifacts (kept on disk, not tracked)
+/package-lock.json
+docs/meetingReports/
+docs/GraduationReports/
+docs/codebase_analysis_*.md
 
 # Testing
 .pytest_cache/

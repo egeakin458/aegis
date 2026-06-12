@@ -1,0 +1,32 @@
+@startgantt
+!include _theme.iuml
+title **Aegis — Project Timeline (Gantt)**\n<size:11><color:#666666>Spring Semester 2026, single engineer</color></size>
+
+printscale weekly
+projectscale daily
+Project starts the 2026-02-16
+
+' ── Work packages ────────────────────────────────────────────────────────────
+[WP1 — Problem Definition & Requirements] as [WP1] lasts 2 weeks
+[WP1] is colored in #EAF1FF/1F6FEB
+
+[WP2 — Conceptual & Alternative Designs] as [WP2] lasts 3 weeks
+[WP2] starts at [WP1]'s end
+[WP2] is colored in #EAF1FF/1F6FEB
+
+[WP3 — Technical Design & Engineering Analysis] as [WP3] lasts 3 weeks
+[WP3] starts at [WP2]'s end
+[WP3] is colored in #EAF1FF/1F6FEB
+
+[WP4 — Evaluation & Final Design Selection] as [WP4] lasts 2 weeks
+[WP4] starts at [WP3]'s end
+[WP4] is colored in #EAF1FF/1F6FEB
+
+[WP5 — Final Documentation & Presentation] as [WP5] lasts 2 weeks
+[WP5] starts at [WP4]'s end
+[WP5] is colored in #EAF1FF/1F6FEB
+
+' ── Milestones ──────────────────────────────────────────────────────────────
+[Pipeline MVP complete] happens at [WP3]'s end
+[Final report submitted] happens at [WP5]'s end
+@endgantt
