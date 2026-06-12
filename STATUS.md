@@ -1,8 +1,8 @@
 # STATUS
 
-Live state. Post-competition (2026-05-16 has passed). Back in development mode.
+Live state. Post-competition (2026-05-16 has passed). **Graduation presentation upcoming: 2026-06-16** — see "Presentation prep" below.
 
-E2E smoke green on `benchmark_02_todo_ddc` 2026-05-27 (run `68775867`, post better-sqlite3 pin) — 20 files generated, 100% feature/test score, 308.5 s wall, 0 code revisions. 288/288 unit tests pass.
+E2E smoke green on `benchmark_02_todo_ddc` 2026-06-12 (run `9580333b`, post RA-prompt cleanup) — 23 files generated, 100% feature/test score, 356.2 s wall, 0 revisions, QA verdict approve (score 5). 302/302 unit tests pass.
 
 ---
 
@@ -13,6 +13,17 @@ Pipeline is demo-ready as of competition. All pre-competition UX polish (Day-1 t
 No code freeze. Free to refactor, add features, address backlog.
 
 No known compat risks carried over after 2026-05-27 cleanup. Backlog #11 (better-sqlite3 Node 22+ incompat) closed by pinning `^11.0.0` in the Developer prompt; generated apps now install cleanly on Node ≥22.
+
+---
+
+## Presentation prep — 2026-06-16
+
+Two open operational items before demo day (not code work). Full risk analysis in the local-only `docs/codebase_analysis_2026-06-12.md`.
+
+- [ ] **Pre-warm the launch target.** The first launch of a generated app runs `npm install` + native better-sqlite3 compile — measured ~95 s cold vs ~7 s warm. Click LaunchPanel (or `POST /api/pipeline/{run_id}/launch`) once on the demo run the day before, so the live click hits the warm path and any install failure surfaces in private. Candidate: fresh smoke output `backend/outputs/9580333b-…` (todo app).
+- [ ] **Rehearse the `?run=` replay fallback.** A live run is 4–6 min of nondeterministic LLM calls (cf. run `d19ca8b5` burning all revision cycles on build failures). Backup plan: open `http://localhost:3000/?run=<completed-run-id>` — replays the full event stream instantly. **Constraint found 2026-06-12**: replay only renders while the run is still in backend memory; after a uvicorn restart the DB-replay SSE path serves raw rows the frontend doesn't parse. So verify the URL renders once, write it down, and don't restart the backend between rehearsal and demo.
+
+Demo-day rules of thumb: one browser tab per live run (single SSE queue per run — a second tab splits the stream); demo the **todo** app, not guestbook (guestbook's Server Components hardcode `fetch('http://localhost:3000/...')` and 500 on launcher ports, see #7).
 
 ---
 
@@ -56,6 +67,9 @@ Carried from pre-competition. Numbering preserved for traceability.
 ## Recently fixed
 
 Pre-competition rehearsal-week work consolidated. For per-fix detail see commit `0a522bb` body and `git log --since=2026-05-10 --until=2026-05-16`.
+
+- **2026-06-12** — **RA prompt ID-generation cleanup** (`b1fe00a`). Collapsed three contradictory drafts (incl. the literal "WAIT — re-read" paragraph) into one rule with unchanged semantics: preserve input ids, otherwise generate human-readable `act_`/`ent_`/`rule_`/`uc_`/`rel_` ids. Embedded example now uses real cross-references and validates against `CustomerConfigV2` (placeholders previously failed referential integrity). Smoke-verified: run `9580333b`, 100% score, 0 revisions, QA approve score 5.
+- **2026-06-12** — Docs reorganization committed (`e66f20c`): poster + updated UML moved out of the competition archive into `docs/Poster/` and `docs/SystemDesignUml/`; thesis folders (meetingReports, GraduationReports) kept local-only via `.gitignore`. Benchmark result JSONs committed as evidence (`1984358`).
 
 - **2026-05-27** — **One-click "Open generated app" button** landed (`44312ed` → `af3e857`). Backend `app/launcher/` subprocess manager + 3 endpoints; frontend `LaunchPanel` above the QuickstartPanel. Auto-opens generated app in a new tab on first transition to running. One app at a time; relaunch kills prior process group (advisor caught the npm-vs-next process-group split early). E2E verified: cold ~96 s, warm ~7 s, prior PID killed, port freed on stop. 302 backend + 77 frontend tests pass. **New finding (out of scope)**: the guestbook generated app does server-side `fetch('http://localhost:3000/...')` from its Server Components and 500s when run on any other port. Worth folding into Developer prompt tightening (#7).
 - **2026-05-27** — **Backlog #8 refuted: QA is calibrated, not rubber-stamping**. Wired `QA_REVIEW_COMPLETE` event (commit `3b4775e`) to expose every QA verdict + `code_quality_score` in `pipeline_events.data_json`. Audited 3 benchmark runs: QA produced score=2 (revise, caught a critical bug), 5 (approve, 2 suggestions), 5 (approve, clean). No always-high pattern. Wiring infra stays for future audits.
