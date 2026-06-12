@@ -1,0 +1,69 @@
+{
+  "benchmark": "benchmark_02_todo_ddc",
+  "run_id": "136548f4-f07c-4eb4-908e-9f6e51d0f42a",
+  "elapsed_s": 416.8,
+  "files_generated": 21,
+  "feature_score": "5/5",
+  "test_score": "5/5",
+  "overall_pct": 100.0,
+  "details": {
+    "expected_features": [
+      {
+        "feature": "Create new tasks with a title and optional description",
+        "passed": true,
+        "keyword_hits": "6/6"
+      },
+      {
+        "feature": "Organize tasks into categories",
+        "passed": true,
+        "keyword_hits": "4/4"
+      },
+      {
+        "feature": "Mark tasks as complete",
+        "passed": true,
+        "keyword_hits": "3/3"
+      },
+      {
+        "feature": "Delete tasks",
+        "passed": true,
+        "keyword_hits": "2/2"
+      },
+      {
+        "feature": "Filter tasks by category",
+        "passed": true,
+        "keyword_hits": "3/3"
+      }
+    ],
+    "unit_tests": [
+      {
+        "test": "POST /api/tasks creates a task and returns 201",
+        "passed": true,
+        "keyword_hits": "3/5"
+      },
+      {
+        "test": "GET /api/tasks returns an array of tasks",
+        "passed": true,
+        "keyword_hits": "2/4"
+      },
+      {
+        "test": "PATCH /api/tasks/:id marks task as completed",
+        "passed": true,
+        "keyword_hits": "3/5"
+      },
+      {
+        "test": "DELETE /api/tasks/:id removes the task",
+        "passed": true,
+        "keyword_hits": "3/4"
+      },
+      {
+        "test": "GET /api/categories returns category list",
+        "passed": true,
+        "keyword_hits": "2/4"
+      }
+    ],
+    "files_generated": 21,
+    "feature_score": "5/5",
+    "test_score": "5/5",
+    "overall": 1.0
+  }
+}

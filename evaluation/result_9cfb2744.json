@@ -1,0 +1,59 @@
+{
+  "benchmark": "benchmark_03_guestbook_ddc",
+  "run_id": "9cfb2744-fed1-4026-a921-e5634dbb135e",
+  "elapsed_s": 158.8,
+  "files_generated": 11,
+  "feature_score": "4/4",
+  "test_score": "4/4",
+  "overall_pct": 100.0,
+  "details": {
+    "expected_features": [
+      {
+        "feature": "Submit a new guestbook message with author name and content",
+        "passed": true,
+        "keyword_hits": "6/7"
+      },
+      {
+        "feature": "View all messages on the page",
+        "passed": true,
+        "keyword_hits": "3/3"
+      },
+      {
+        "feature": "Messages display author name, content, and timestamp",
+        "passed": true,
+        "keyword_hits": "5/6"
+      },
+      {
+        "feature": "Messages are ordered newest first",
+        "passed": true,
+        "keyword_hits": "4/4"
+      }
+    ],
+    "unit_tests": [
+      {
+        "test": "POST /api/messages creates a message and returns 201",
+        "passed": true,
+        "keyword_hits": "4/5"
+      },
+      {
+        "test": "POST /api/messages rejects empty author_name or content with 400",
+        "passed": true,
+        "keyword_hits": "5/7"
+      },
+      {
+        "test": "GET /api/messages returns an array of messages",
+        "passed": true,
+        "keyword_hits": "4/4"
+      },
+      {
+        "test": "GET /api/messages returns messages sorted by created_at descending",
+        "passed": true,
+        "keyword_hits": "5/6"
+      }
+    ],
+    "files_generated": 11,
+    "feature_score": "4/4",
+    "test_score": "4/4",
+    "overall": 1.0
+  }
+}
