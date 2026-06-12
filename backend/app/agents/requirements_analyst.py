@@ -37,11 +37,13 @@ _DDC_EXAMPLE = """{
   },
   "actors": [
     {
+      "id": "act_customer",
       "role_name": "Customer",
       "auth_method": "email_password",
       "permissions_description": "Can browse products, add items to cart, place orders, and view their own order history."
     },
     {
+      "id": "act_admin",
       "role_name": "Admin",
       "auth_method": "email_password",
       "permissions_description": "Can manage the product catalog (create, update, remove products), view all customer orders, and update order states."
@@ -49,6 +51,7 @@ _DDC_EXAMPLE = """{
   ],
   "entities": [
     {
+      "id": "ent_product",
       "name": "Product",
       "attributes": [
         { "name": "title",       "type": "string",  "required": true,  "unique": false },
@@ -59,6 +62,7 @@ _DDC_EXAMPLE = """{
       "states": ["Active", "OutOfStock", "Discontinued"]
     },
     {
+      "id": "ent_order",
       "name": "Order",
       "attributes": [
         { "name": "total",      "type": "decimal",  "required": true  },
@@ -70,14 +74,16 @@ _DDC_EXAMPLE = """{
   ],
   "relationships": [
     {
-      "from_entity_id": "<Order.id>",
-      "to_entity_id": "<Product.id>",
+      "id": "rel_order_items",
+      "from_entity_id": "ent_order",
+      "to_entity_id": "ent_product",
       "kind": "many_to_many",
       "name": "order_items"
     }
   ],
   "business_rules": [
     {
+      "id": "rule_stock_check",
       "description": "Product stock must be sufficient before an order can be confirmed.",
       "trigger_condition": "When Order transitions from Pending to Confirmed",
       "enforcement_action": "Reject with 422 if any item quantity exceeds Product.stock"
@@ -85,18 +91,20 @@ _DDC_EXAMPLE = """{
   ],
   "use_cases": [
     {
+      "id": "uc_browse_products",
       "name": "Browse Products",
       "type": "query",
-      "actor_id": "<Customer.id>",
-      "primary_entity_id": "<Product.id>",
+      "actor_id": "act_customer",
+      "primary_entity_id": "ent_product",
       "business_rule_ids": []
     },
     {
+      "id": "uc_place_order",
       "name": "Place Order",
       "type": "command",
-      "actor_id": "<Customer.id>",
-      "primary_entity_id": "<Order.id>",
-      "business_rule_ids": ["<rule.id>"]
+      "actor_id": "act_customer",
+      "primary_entity_id": "ent_order",
+      "business_rule_ids": ["rule_stock_check"]
     }
   ]
 }"""
@@ -120,12 +128,11 @@ You receive either:
 
 In both cases you may ask clarification questions (max 5) if you genuinely cannot infer something that would materially change the architecture.
 
-ID GENERATION — CRITICAL
-Do NOT output "id" fields for actors, entities, relationships, rules, or use cases. The server generates all IDs automatically. Only reference IDs in cross-references (actor_id, primary_entity_id, etc.) — use the placeholder format <EntityName.id> in your reasoning, but in the final JSON output omit all "id" fields entirely and use the actual generated ID values for cross-references only after IDs are assigned by the server. Since IDs are server-generated, for cross-references in your output use the IDs from the input if they were provided; otherwise leave cross-reference fields pointing to the objects you described (the server resolves them).
-
-WAIT — re-read: since the server generates IDs via default_factory, your JSON output must NOT include any "id" field. For cross-reference fields (actor_id, primary_entity_id, from_entity_id, to_entity_id, business_rule_ids), you MUST use the actual id values from the actors/entities/rules you define. This means: define actors and entities first (without id fields), then reference them. Since you cannot know the generated IDs before the server runs, use a two-pass approach in your JSON: reference the objects by their position-stable identifiers. In practice, you should include the "id" fields in your output ONLY for cross-reference resolution — i.e., you CAN include id fields if you need them for referencing, but you SHOULD NOT invent arbitrary values. Let Pydantic assign default UUIDs; only include id fields when you are reusing IDs from the input.
-
-SIMPLIFIED RULE: If the input already contains id fields, preserve them exactly. If the input does not contain id fields, omit all id fields from your output. For cross-references (actor_id, primary_entity_id, etc.), you must include the referenced object's id — so if you omit ids, you must still provide consistent cross-reference values. The safest approach: include id fields with short, human-readable values (e.g., "act_customer", "ent_product") so cross-references are consistent within the same JSON document.
+ID GENERATION
+Every actor, entity, business rule, relationship, and use case must have an "id" field so that cross-references (actor_id, primary_entity_id, from_entity_id, to_entity_id, business_rule_ids) resolve within the same JSON document.
+- If the input already provides id values, preserve them exactly and use them in cross-references.
+- Otherwise, assign short human-readable ids with these prefixes: actors "act_", entities "ent_", business rules "rule_", use cases "uc_", relationships "rel_" (e.g., "act_customer", "ent_product", "rule_stock_check").
+- Every cross-reference must point to an id defined elsewhere in the same document. Configs with unresolved references are rejected by validation.
 
 CONSTRAINTS
 - AUTHENTICATION SCOPE — CRITICAL: Do NOT introduce authentication, login, signup, or account-related actors or use cases unless the customer's domain_description explicitly mentions one of: "login", "sign up", "sign in", "account", "register", "password", "authentication", "user roles", "permissions", "admin", or a clearly multi-role workflow (e.g. "customers and staff"). For single-user personal tools or descriptions that don't mention identity (e.g. a personal task manager, a notes app, a calculator), use a single actor with auth_method = "anonymous" and permissions_description = "Anonymous single user." Do NOT add Login/Signup/Register use cases. Do NOT add a User or Account entity. The generated app must work without auth libraries.
