@@ -297,15 +297,37 @@ class TestStreamEvents:
         ):
             mock_manager.get_entry.return_value = None
             mock_repo.get_run = AsyncMock(return_value={"run_id": "run-old", "state": "complete"})
+            # Realistic rows: get_events does SELECT *, so every DB column is
+            # present (data stored as a JSON string in data_json, tokens flat).
             mock_repo.get_events = AsyncMock(return_value=[
-                {"event_id": "e1", "event_type": "pipeline_started", "message": "Started"},
-                {"event_id": "e2", "event_type": "pipeline_complete", "message": "Done"},
+                {
+                    "event_id": "e1", "run_id": "run-old",
+                    "timestamp": "2026-06-15T19:50:46.111176+00:00",
+                    "agent": "system", "event_type": "pipeline_started",
+                    "message": "Started", "data_json": "{}",
+                    "input_tokens": 0, "output_tokens": 0,
+                    "duration_ms": None, "pipeline_state": "intake",
+                },
+                {
+                    "event_id": "e2", "run_id": "run-old",
+                    "timestamp": "2026-06-15T19:58:29.445000+00:00",
+                    "agent": "system", "event_type": "pipeline_complete",
+                    "message": "Done", "data_json": "{\"final\": true}",
+                    "input_tokens": 1450, "output_tokens": 2146,
+                    "duration_ms": 26538, "pipeline_state": "complete",
+                },
             ])
 
             response = client.get("/api/pipeline/run-old/events")
 
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["content-type"]
+            # DB replay must match the live to_sse() shape the frontend parses:
+            # a reshaped `data` object + nested `tokens_used`, never the raw
+            # `data_json` string or flat token columns.
+            assert '"data_json"' not in response.text
+            assert '"data":{"final":true}' in response.text
+            assert '"tokens_used":{"input_tokens":1450' in response.text
 
 
 # ============================================================

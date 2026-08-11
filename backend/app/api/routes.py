@@ -26,7 +26,7 @@ from app.db import repositories as repo
 from app.launcher import app_launcher
 from app.pipeline.manager import runner_manager
 from app.schemas.customer_config import CustomerConfigV2, SCHEMA_VERSION as DDC_SCHEMA_VERSION
-from app.schemas.pipeline_events import EventType, PipelineState
+from app.schemas.pipeline_events import EventType, PipelineState, PipelineEvent, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +78,33 @@ async def stream_events(run_id: str):
         if db_run is None:
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
 
-        # Serve historical events from DB
+        # Serve historical events from DB. Reconstruct each PipelineEvent from
+        # its row and serialize via the same to_sse() the live path uses, so a
+        # cold-start replay (after the run has left memory) is byte-identical to
+        # the in-memory replay the frontend parses. Raw rows carry data_json (a
+        # string) and flat token columns, which the frontend cannot render.
         async def _replay_from_db() -> AsyncGenerator[str, None]:
-            events = await repo.get_events(run_id)
-            for event_row in events:
-                yield json.dumps(event_row, default=str)
+            rows = await repo.get_events(run_id)
+            for row in rows:
+                tokens = None
+                if (row["input_tokens"] or 0) or (row["output_tokens"] or 0):
+                    tokens = TokenUsage(
+                        input_tokens=row["input_tokens"] or 0,
+                        output_tokens=row["output_tokens"] or 0,
+                    )
+                event = PipelineEvent(
+                    event_id=row["event_id"],
+                    run_id=row["run_id"],
+                    timestamp=row["timestamp"],
+                    agent=row["agent"],
+                    event_type=row["event_type"],
+                    message=row["message"],
+                    data=json.loads(row["data_json"] or "{}"),
+                    tokens_used=tokens,
+                    duration_ms=row["duration_ms"],
+                    pipeline_state=row["pipeline_state"],
+                )
+                yield event.to_sse()
 
         return EventSourceResponse(_replay_from_db())
 
