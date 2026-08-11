@@ -58,7 +58,7 @@ Thumbs.db
 # Local-only artifacts (kept on disk, not tracked)
 /package-lock.json
 .claude/
-.backend/.claude/*
+backend/.claude/
 docs/
 docs/meetingReports/
 docs/GraduationReports/
