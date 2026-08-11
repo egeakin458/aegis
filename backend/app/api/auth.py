@@ -23,12 +23,14 @@ async def require_api_key(authorization: str | None = Header(default=None)) -> N
     FastAPI dependency that enforces a Bearer token matching settings.api_key.
 
     Returns None on success; raises HTTPException(401) on failure.
-    Disabled when settings.api_key is the empty string.
+    The app fails closed: an empty API key is treated as misconfiguration.
     """
     expected = settings.api_key
     if not expected:
-        # Auth disabled — dev mode.
-        return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key is not configured",
+        )
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(

@@ -13,13 +13,30 @@ venv/
 .env
 .env.local
 .env.production
+**/.env
+**/.env.*
+**/.env.local
+**/.env.production
 
 # Database
 *.db
 *.sqlite3
+**/*.db
+**/*.sqlite3
 
 # Generated outputs
 outputs/
+backend/outputs/
+frontend/.next/
+backend/build_sandbox/node_modules/
+**/node_modules/
+**/.next/
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/__pycache__/
+**/.vercel/
+**/.claude/settings.local.json
 
 # Node / Frontend
 node_modules/

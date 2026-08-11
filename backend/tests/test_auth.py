@@ -2,7 +2,7 @@
 Tests for API key authentication on /api/pipeline routes.
 
 Auth contract:
-- If settings.api_key == "", auth is disabled (every request passes).
+- If settings.api_key == "", the app must fail closed and reject requests.
 - If settings.api_key is set, requests must send `Authorization: Bearer <key>`.
 - Wrong key or missing header → 401.
 - The /health endpoint is always public.
@@ -34,22 +34,16 @@ def client():
 
 
 class TestAuthDisabled:
-    """When api_key is empty string, auth must be a no-op."""
+    """When api_key is empty string, requests must be rejected."""
 
-    def test_no_header_passes_when_key_empty(self, client):
-        with (
-            patch("app.api.auth.settings") as mock_settings,
-            patch("app.api.routes.runner_manager") as mock_manager,
-            patch("app.api.routes.repo") as mock_repo,
-        ):
+    def test_empty_key_is_rejected(self, client):
+        with patch("app.api.auth.settings") as mock_settings:
             mock_settings.api_key = ""
-            mock_manager.get_entry.return_value = None
-            mock_repo.get_run = AsyncMock(return_value=None)
 
             response = client.get("/api/pipeline/run-x/status")
 
-            # 404 (run not found) — not 401 — proves auth was bypassed.
-            assert response.status_code == 404
+            assert response.status_code == 401
+            assert response.json()["detail"] == "API key is not configured"
 
 
 class TestAuthEnabled:

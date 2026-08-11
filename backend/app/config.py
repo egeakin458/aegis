@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     max_clarification_rounds: int = 3
 
     # API security
-    api_key: str = ""  # Shared secret for frontend-backend auth
+    api_key: str = ""  # Shared secret for frontend-backend auth; must be set in production
     allowed_origin: str = ""  # Optional explicit production domain for CORS (e.g. https://aegis.example.com)
 
     # Database
