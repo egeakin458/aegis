@@ -60,6 +60,11 @@ Thumbs.db
 docs/meetingReports/
 docs/GraduationReports/
 docs/codebase_analysis_*.md
+*.markdown
+*.mdx
+**/*.md
+!README.md
+!**/README.md
 
 # Testing
 .pytest_cache/
