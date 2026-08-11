@@ -1,35 +1,33 @@
 # Aegis — Virtual Software Company
 
-A multi-agent AI pipeline that operates as a virtual software company, producing full-stack web applications from plain-language business requirements.
+Aegis is a structured multi-agent AI pipeline that generates full-stack web applications from business requirements.
 
-**Senior Thesis Project** — Izmir University of Economics, Department of Computer Engineering
+## What it does
 
-## Architecture
+A user supplies a domain-driven configuration. The pipeline uses four agents to convert that input into:
+- a finalized requirements model
+- a technical design
+- generated application code
+- a QA review and revision cycle
 
-```
-Customer → Intake Form → Requirements Analyst → Solution Architect → Developer → QA Reviewer → Output
-                              ↑                                          |              |
-                              |                    Code revision (max 2) ←──────────────┤
-                              |                    Design revision (max 1) ←────────────┘
-```
+## Core architecture
 
-## Tech Stack
+- Backend: Python 3.12, FastAPI, SQLite
+- Frontend: Next.js 14, Tailwind CSS, shadcn/ui
+- LLM: Anthropic Claude API
+- Real-time: SSE for pipeline event streaming
+- Generated output: self-contained Next.js apps in `backend/outputs`
 
-- **Backend:** Python 3.12 + FastAPI
-- **Frontend:** Next.js 14+ + Tailwind CSS + shadcn/ui
-- **LLM:** Anthropic Claude API (Sonnet 4.5 + Haiku 4.5)
-- **Real-time:** Server-Sent Events (SSE)
-- **Database:** SQLite + filesystem
-
-## Quick Start
+## Quick start
 
 ### Backend
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # Then edit .env with your API key
+cp .env.example .env
+# set ANTHROPIC_API_KEY in .env
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -40,6 +38,17 @@ npm install
 npm run dev
 ```
 
-## Project Structure
+## Repository layout
 
-See `CLAUDE.md` for full project context and current implementation status.
+- `backend/app` — backend application code
+- `backend/tests` — backend tests
+- `backend/build_sandbox` — isolated build-check sandbox for generated apps
+- `backend/outputs` — generated app output directories
+- `frontend` — user interface and pipeline dashboard
+- `docs` — project and archive documentation
+- `CLAUDE.md`, `STATUS.md`, `WORKFLOW.md` — internal design and project status notes
+
+## Notes
+
+- The backend must be running before the frontend can interact with the pipeline.
+- `CLAUDE.md` and `STATUS.md` contain the implementation context and current project state.
