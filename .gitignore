@@ -57,6 +57,8 @@ Thumbs.db
 
 # Local-only artifacts (kept on disk, not tracked)
 /package-lock.json
+.claude/
+docs/
 docs/meetingReports/
 docs/GraduationReports/
 docs/codebase_analysis_*.md
