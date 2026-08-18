@@ -24,13 +24,24 @@ The pipeline is a state machine that orchestrates four AI agents in sequence, wi
 
 ### Pipeline flow
 
-```
-INTAKE → REQUIREMENTS → [CLARIFICATION ↔ REQUIREMENTS] → DESIGN →
-DEVELOPMENT → BUILD_CHECK → REVIEW → COMPLETE
-                                      ↑          ↓
-                              CODE_REVISION ← revise_code (max 2 cycles)
-                                      ↑          ↓
-                             DESIGN_REVISION ← revise_design (max 1 cycle) → DESIGN → ...
+```mermaid
+graph LR
+    A[INTAKE] --> B[REQUIREMENTS]
+    B --> C{Clarification?}
+    C -->|Yes| D[CLARIFICATION]
+    D -->|User answers| B
+    C -->|No| E[DESIGN]
+    E --> F[DEVELOPMENT]
+    F --> G[BUILD_CHECK]
+    G --> H{Passed?}
+    H -->|Yes| I[REVIEW]
+    H -->|No, max 2| J[CODE_REVISION]
+    J --> F
+    I --> K{Verdict?}
+    K -->|approve| L[COMPLETE]
+    K -->|revise_code, max 2| J
+    K -->|revise_design, max 1| M[DESIGN_REVISION]
+    M --> E
 ```
 
 ### Step-by-step data flow
