@@ -37,6 +37,31 @@ The pipeline is a state machine that orchestrates four AI agents in sequence, wi
 | DESIGN_REVISION | Solution Architect | TechnicalDesign | DESIGN (max 1 cycle) |
 | COMPLETE | System | Generated files | (end) |
 
+<details>
+<summary>Alternative: Mermaid diagram (rendered on GitHub)</summary>
+
+```mermaid
+graph LR
+    A[INTAKE] --> B[REQUIREMENTS]
+    B --> C{Clarification?}
+    C -->|Yes| D[CLARIFICATION]
+    D -->|User answers| B
+    C -->|No| E[DESIGN]
+    E --> F[DEVELOPMENT]
+    F --> G[BUILD_CHECK]
+    G --> H{Passed?}
+    H -->|Yes| I[REVIEW]
+    H -->|No, max 2| J[CODE_REVISION]
+    J --> F
+    I --> K{Verdict?}
+    K -->|approve| L[COMPLETE]
+    K -->|revise_code, max 2| J
+    K -->|revise_design, max 1| M[DESIGN_REVISION]
+    M --> E
+```
+
+</details>
+
 ### Step-by-step data flow
 
 1. **User submits requirements** — Frontend sends a Domain-Driven Configuration (DDC) to `POST /api/pipeline/start`. Backend returns a `run_id`.
