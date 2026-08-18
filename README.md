@@ -24,25 +24,18 @@ The pipeline is a state machine that orchestrates four AI agents in sequence, wi
 
 ### Pipeline flow
 
-```mermaid
-graph LR
-    A[INTAKE] --> B[REQUIREMENTS]
-    B --> C{Clarification?}
-    C -->|Yes| D[CLARIFICATION]
-    D -->|User answers| B
-    C -->|No| E[DESIGN]
-    E --> F[DEVELOPMENT]
-    F --> G[BUILD_CHECK]
-    G --> H{Passed?}
-    H -->|Yes| I[REVIEW]
-    H -->|No, max 2| J[CODE_REVISION]
-    J --> F
-    I --> K{Verdict?}
-    K -->|approve| L[COMPLETE]
-    K -->|revise_code, max 2| J
-    K -->|revise_design, max 1| M[DESIGN_REVISION]
-    M --> E
-```
+| Phase | Agent | Output | Next Phase |
+|-------|-------|--------|------------|
+| INTAKE | System | Pipeline started | REQUIREMENTS |
+| REQUIREMENTS | Requirements Analyst | CustomerConfigV2 or questions | CLARIFICATION or DESIGN |
+| CLARIFICATION | (paused) | User answers | REQUIREMENTS |
+| DESIGN | Solution Architect | TechnicalDesign | DEVELOPMENT |
+| DEVELOPMENT | Developer | CodeOutput | BUILD_CHECK |
+| BUILD_CHECK | System | BuildCheckResult | REVIEW or CODE_REVISION |
+| REVIEW | QA Reviewer | QAReview (approve/revise) | COMPLETE, CODE_REVISION, or DESIGN_REVISION |
+| CODE_REVISION | Developer | CodePatch | BUILD_CHECK (max 2 cycles) |
+| DESIGN_REVISION | Solution Architect | TechnicalDesign | DESIGN (max 1 cycle) |
+| COMPLETE | System | Generated files | (end) |
 
 ### Step-by-step data flow
 
